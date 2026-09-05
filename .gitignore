@@ -1,0 +1,48 @@
+# ===== OS 系统文件 =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===== 编辑器 / IDE =====
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== 日志 / 临时文件 =====
+*.log
+tmp/
+temp/
+
+# ===== Godot =====
+.godot/
+*.translation
+
+# ===== Unity =====
+[Ll]ibrary/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Uu]ser[Ss]ettings/
+MemoryCaptures/
+*.csproj
+*.sln
+*.user
+
+# ===== Node.js（如果用 JS/TS 做 Web 游戏）=====
+node_modules/
+dist/
+.vite/
+
+# ===== Python（如果用 Pygame 等）=====
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ===== 像素图/音频源文件备份（可按需调整）=====
+*.bak
+*~
