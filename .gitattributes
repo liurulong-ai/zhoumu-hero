@@ -1,0 +1,63 @@
+# ===== Unity LFS：二进制资源走 Git LFS =====
+# 图像（含像素图源文件）
+*.png filter=lfs diff=lfs merge=lfs -text
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.tga filter=lfs diff=lfs merge=lfs -text
+*.bmp filter=lfs diff=lfs merge=lfs -text
+*.gif filter=lfs diff=lfs merge=lfs -text
+*.webp filter=lfs diff=lfs merge=lfs -text
+*.psd filter=lfs diff=lfs merge=lfs -text
+*.ase filter=lfs diff=lfs merge=lfs -text
+*.aseprite filter=lfs diff=lfs merge=lfs -text
+
+# 音频
+*.wav filter=lfs diff=lfs merge=lfs -text
+*.mp3 filter=lfs diff=lfs merge=lfs -text
+*.ogg filter=lfs diff=lfs merge=lfs -text
+*.flac filter=lfs diff=lfs merge=lfs -text
+
+# 视频
+*.mp4 filter=lfs diff=lfs merge=lfs -text
+*.mov filter=lfs diff=lfs merge=lfs -text
+*.avi filter=lfs diff=lfs merge=lfs -text
+
+# 字体
+*.ttf filter=lfs diff=lfs merge=lfs -text
+*.otf filter=lfs diff=lfs merge=lfs -text
+
+# 3D 模型 / 美术工程
+*.fbx filter=lfs diff=lfs merge=lfs -text
+*.obj filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+
+# Unity 包 / 归档
+*.unitypackage filter=lfs diff=lfs merge=lfs -text
+*.bundle filter=lfs diff=lfs merge=lfs -text
+*.assetbundle filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text
+
+# ===== Unity 文本资源：换行 + 合并策略 =====
+# 需要 Unity 编辑器里启用 External Tools → Version Control → Visible Meta Files，
+# 并在 Team/Settings 中允许内置合并 (Smart Merge / unityyamlmerge)
+*.unity -text merge=unityyamlmerge eol=lf diff
+*.prefab -text merge=unityyamlmerge eol=lf diff
+*.asset -text merge=unityyamlmerge eol=lf diff
+*.mat -text merge=unityyamlmerge eol=lf diff
+*.controller -text merge=unityyamlmerge eol=lf diff
+*.anim -text merge=unityyamlmerge eol=lf diff
+*.physicMaterial -text merge=unityyamlmerge eol=lf diff
+*.physicsMaterial2D -text merge=unityyamlmerge eol=lf diff
+
+# meta 文件：纯文本，统一 LF
+*.meta -text merge=unityyamlmerge eol=lf diff
+
+# ===== 脚本与配置：统一 LF，正常 diff/merge =====
+*.cs text diff
+*.json text diff
+*.asmdef text diff
+*.shader text diff
+*.hlsl text diff
+*.md text diff
+.gitattributes text
+.gitignore text
