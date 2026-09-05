@@ -4,45 +4,41 @@ Thumbs.db
 Desktop.ini
 
 # ===== 编辑器 / IDE =====
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+.vs/
 .idea/
 *.swp
 *.swo
-*~
+*.user
+*.suo
 
-# ===== 日志 / 临时文件 =====
-*.log
-tmp/
-temp/
-
-# ===== Godot =====
-.godot/
-*.translation
-
-# ===== Unity =====
+# ===== Unity 核心 =====
 [Ll]ibrary/
+[Tt]emp/
 [Oo]bj/
 [Bb]uild/
 [Bb]uilds/
+[Ll]ogs/
 [Uu]ser[Ss]ettings/
 MemoryCaptures/
+.crashlytics/
+sysinfo.txt
+
+# ===== Unity 项目文件（由编辑器自动生成）=====
 *.csproj
 *.sln
-*.user
+*.unityproj
+*.pidb
+*.booproj
 
-# ===== Node.js（如果用 JS/TS 做 Web 游戏）=====
-node_modules/
-dist/
-.vite/
+# ===== Unity 其他 =====
+/[Aa]ssets/AssetStoreTools*
+ExportedObj/
+.unitypackage.meta.tmp
+*.apk
+*.aab
+*.symbols.json
 
-# ===== Python（如果用 Pygame 等）=====
-__pycache__/
-*.pyc
-.venv/
-venv/
-
-# ===== 像素图/音频源文件备份（可按需调整）=====
+# ===== 日志 / 临时文件 =====
+*.log
 *.bak
 *~
