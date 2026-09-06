@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星域契约：裂隙纪元 · 垂直切片</title>
+<style>
+  :root { color-scheme: dark;
+    --gold:#ffd76e; --ink:#14141f; --panel:#1c2130; --line:#3a4160; --txt:#e8eaf2; --dim:#9aa1bd; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d0f17; color:var(--txt);
+    font-family:"PingFang SC","Microsoft YaHei",monospace,sans-serif;
+    display:flex; flex-direction:column; align-items:center; min-height:100vh; padding:12px; }
+  h1 { font-size:17px; letter-spacing:3px; color:var(--gold); text-shadow:0 2px 0 #7a5b13; margin-top:2px; }
+  .sub { font-size:11px; color:var(--dim); margin:2px 0 8px; }
+  #stage { position:relative; line-height:0; border:3px solid var(--line); border-radius:6px;
+    box-shadow:0 10px 44px rgba(0,0,0,.65); overflow:hidden; }
+  canvas { image-rendering:pixelated; image-rendering:crisp-edges; display:block; background:#22301f; }
+  /* 战斗 UI 覆盖层 */
+  #battleUI { position:absolute; inset:0; display:none; flex-direction:column; justify-content:flex-end;
+    pointer-events:none; }
+  #battleUI.on { display:flex; }
+  #log { pointer-events:none; margin:0 auto 6px; width:94%; background:rgba(12,14,22,.82);
+    border:1px solid var(--line); border-radius:6px; padding:7px 10px; font-size:12px; line-height:1.5;
+    color:var(--txt); min-height:34px; }
+  #actions { pointer-events:auto; display:grid; grid-template-columns:repeat(4,1fr); gap:6px; padding:0 10px 10px; }
+  .act { pointer-events:auto; border:1px solid var(--line); border-bottom-width:3px; border-radius:7px;
+    background:linear-gradient(#2b3250,#20253a); color:var(--txt); font-size:12px; padding:10px 4px;
+    cursor:pointer; font-family:inherit; }
+  .act:active { transform:translateY(2px); }
+  .act:disabled { opacity:.4; cursor:default; }
+  .act .ty { display:block; font-size:9px; color:var(--dim); margin-top:2px; }
+  .act.primary { background:linear-gradient(#3a4a7a,#2a3458); }
+  .act.seal { background:linear-gradient(#5a4a2a,#3e3420); color:var(--gold); }
+  /* 切换菜单 */
+  #switchMenu { pointer-events:auto; display:none; margin:0 10px 8px; background:rgba(14,16,26,.95);
+    border:1px solid var(--line); border-radius:8px; padding:8px; }
+  #switchMenu.on { display:block; }
+  .partyRow { display:flex; gap:8px; align-items:center; padding:6px; border-radius:6px; cursor:pointer; }
+  .partyRow:hover { background:#262c44; }
+  .partyRow.dead { opacity:.4; }
+  .partyRow.active { background:#2c3554; }
+  .bar { flex:1; height:7px; background:#000; border-radius:4px; overflow:hidden; }
+  .bar > i { display:block; height:100%; background:#5ad45c; }
+  .pname { width:88px; font-size:12px; }
+  .php { width:60px; text-align:right; font-size:11px; color:var(--dim); }
+  .hint { margin-top:9px; font-size:11px; color:var(--dim); text-align:center; line-height:1.7; }
+  kbd { background:#262a3a; border:1px solid #454b66; border-bottom-width:2px; border-radius:3px; padding:1px 6px; font-size:10px; }
+</style>
+</head>
+<body>
+<h1>星 域 契 约 · 裂 隙 纪 元</h1>
+<div class="sub">垂直切片 v0.1 · 探索 · 域印战斗 · 契约 · 养成</div>
+<div id="stage">
+  <canvas id="cv" width="480" height="300"></canvas>
+  <div id="battleUI">
+    <div id="log"></div>
+    <div id="switchMenu"></div>
+    <div id="actions"></div>
+  </div>
+</div>
+<div class="hint">
+  <kbd>W A S D</kbd>/方向键 移动 · 草丛/水边/岩地/暗林会遭遇异兽 ·
+  战斗中点击下方按钮（或 <kbd>1-4</kbd> 技能 <kbd>C</kbd>契约 <kbd>P</kbd>道具 <kbd>S</kbd>切换 <kbd>F</kbd>逃跑）<br>
+  核心创新：<b style="color:var(--gold)">域印</b>——场地属性会增幅同系技能并使同系异兽「觉醒」。回到<b style="color:#7fd45c">绿泉</b>可回复全队。
+</div>
+<script>
+'use strict';
+/* ============================================================
+   星域契约：裂隙纪元 —— 垂直切片
+   闭环：野外探索 → 遭遇 → 域印回合战斗 → 契约捕捉 → 养成升级
+   ============================================================ */
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const W = 480, H = 300;
+function fitScale(){
+  const s = Math.max(1, Math.min(Math.floor((innerWidth-30)/W), Math.floor((innerHeight-150)/H)));
+  cv.style.width = W*s+'px'; cv.style.height = H*s+'px';
+}
+addEventListener('resize', fitScale); fitScale();
+
+// ---------------- 音效 ----------------
+let AC=null;
+function beep(f0,f1,dur,type='square',vol=0.06){ try{
+  if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==='suspended') AC.resume();
+  const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;
+  o.type=type; o.frequency.setValueAtTime(f0,t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t+dur);
+}catch(e){} }
+const SFX={
+  move:()=>beep(300,240,.05,'triangle',.03),
+  hit:()=>beep(240,90,.1,'square',.07),
+  weak:()=>beep(180,120,.08,'square',.05),
+  eff:()=>beep(520,760,.12,'sine',.06),
+  seal:()=>{beep(660,880,.08,'sine',.06);setTimeout(()=>beep(880,1180,.1,'sine',.06),90);},
+  fail:()=>beep(300,140,.25,'sawtooth',.07),
+  heal:()=>{[523,659,784].forEach((f,i)=>setTimeout(()=>beep(f,f,.12,'triangle',.06),i*90));},
+  enc:()=>{beep(120,80,.35,'sawtooth',.08);setTimeout(()=>beep(90,60,.4,'sawtooth',.08),200);},
+  win:()=>{[523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,f,.15,'square',.07),i*130));},
+};
+
+// ---------------- 像素精灵 ----------------
+const PAL={ g:'#7fd45c',G:'#4e9438',d:'#35682a', r:'#e8563c',R:'#a52c22',
+  b:'#56a6e8',B:'#2f6ea8', y:'#ffd76e',Y:'#c79a2a', p:'#b07fe8',P:'#7a4fb0',
+  w:'#f2f4ff',k:'#26262e', o:'#c98a4a',O:'#8a5a2a', c:'#8ad0d8',C:'#4a8a98',
+  f:'#f2c9a0', e:'#1a1a22', m:'#6b7290', n:'#5a4030' };
+function makeSprite(rows){
+  const h=rows.length,w=rows[0].length,c=document.createElement('canvas');
+  c.width=w;c.height=h; const g=c.getContext('2d');
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const ch=rows[y][x];
+    if(ch!=='.'){g.fillStyle=PAL[ch]||'#f0f';g.fillRect(x,y,1,1);}}
+  return c;
+}
+function whiteOf(spr){const c=document.createElement('canvas');c.width=spr.width;c.height=spr.height;
+  const g=c.getContext('2d');g.drawImage(spr,0,0);g.globalCompositeOperation='source-in';
+  g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);return c;}
+const SPR={};
+SPR.player=makeSprite([
+  '....bbbb....','...bbbbbb...','...BffffB...','...BfefeB...','...BffffB...',
+  '....bbbb....','...mmmmmm...','..mmmmmmmm..','.smmMMMMmms.','..smmmmmms..',
+  '...wwwwww...','...nn..nn...','...nn..nn...','...kk..kk...']);
+// 烬叶鹿（木）
+SPR.deer=makeSprite([
+  '..y....y....','..yg..gy....','...gggg.....','..ggggggg...','.ggegggegg..',
+  '.ggggggggg..','ggggGGGGggg.','.gGGGGGGg...','..g.gg.g....','..g..g..g...']);
+// 熔岩犀（火）
+SPR.rhino=makeSprite([
+  '....yy......','..rrrrrrr...','.rrRrrrrrr..','rrrerrrerr..','rrrrrrrrrrr.',
+  'rRRRRRRRRRr.','.rrRRRRRrr..','.r.rrrr.r...','..r..r..r...']);
+// 断潮鲛（水）
+SPR.fish=makeSprite([
+  '...bbbb.....','..bbbbbb...b','.bbBbbbbb.bb','.bbebbbebbbb','bbbbbbbbbbB.',
+  '.bBBBBBBb...','..b.bb.b....','............']);
+// 镜月狐（幻）
+SPR.fox=makeSprite([
+  '...w....w...','...ww..ww...','..wwwwww....','.wwwewweww..','.wwwwwwwww..','wwwwYYwwww..',
+  '.wwwwwwww...','..ww..ww....','..w....w....']);
+// 岩脊蜥（土）
+SPR.lizard=makeSprite([
+  '..oooo......','.ooOOoo.....','ooeooeooo...','oooooooo....','oOOOOOOo....',
+  '.oo..oo.....','.o....o.....']);
+// 幽冥蝠（暗）
+SPR.bat=makeSprite([
+  'p.........p','pp.......pp','.pp.pppp.pp.','..pppepppp..','..ppppppp...',
+  '.pp.ppp.pp..','p...p.p...p.']);
+for(const k in SPR) SPR[k+'W']=whiteOf(SPR[k]);
+// 树 / 泉
+SPR.tree=makeSprite([
+  '.....tttt.......','...tttttttt.....','..ttttTTtttt....','.ttttTTTTtttt...',
+  '.ttTTttttTTtt...','tttTttttttTttt..','tttttttttttttt..','.tttttttttttt...',
+  '..tttttttttt....','...tttttttt.....','.....oooo.......','.....oooo.......','....OooooO......']);
+SPR.spring=makeSprite([
+  '.cccccc.','cwwwwwwc','cwcwcwcc','cwwwwwwc','.cccccc.']);
+
+// ---------------- 类型与域印 ----------------
+// 攻击类型 -> 被克防御类型（造成 1.6x）；其余 1x；同系 STAB 1.3x
+const SUPER={ fire:['wood','ice'], water:['fire','earth'], wood:['earth','water'],
+  earth:['thunder','fire'], thunder:['water','ice'], ice:['wood','earth'],
+  light:['dark'], dark:['illusion','light'], illusion:['dark'] };
+const TYPE_CN={ fire:'火',water:'水',wood:'木',earth:'土',thunder:'雷',ice:'冰',light:'光',dark:'暗',illusion:'幻' };
+const TYPE_COLOR={ fire:'#e8563c',water:'#56a6e8',wood:'#7fd45c',earth:'#c98a4a',
+  thunder:'#ffe14d',ice:'#9fd8ff',light:'#fff3b0',dark:'#b07fe8',illusion:'#f2a6e8' };
+function typeMulti(atk,def){
+  let m=1;
+  if(SUPER[atk]&&SUPER[atk].includes(def)) m*=1.6;
+  // 反向抵抗
+  for(const a in SUPER) if(SUPER[a].includes(atk)&&a===def) m*=0.625;
+  return m;
+}
+// 场地（域印）：决定增幅属性 & 野外遭遇池
+const FIELDS={
+  grass:{ name:'晨曦草原', dom:'wood', tint:'#2f5029', enc:['deer','deer','fox'] },
+  water:{ name:'涟漪水畔', dom:'water', tint:'#26405c', enc:['fish','fish','deer'] },
+  rock: { name:'龟裂岩地', dom:'earth', tint:'#4a3a2a', enc:['lizard','lizard','rhino'] },
+  dark: { name:'幽语暗林', dom:'dark', tint:'#2a2438', enc:['bat','fox','bat'] },
+};
+
+// ---------------- 技能 ----------------
+function MV(name,type,power,cost,desc,extra){return Object.assign({name,type,power,cost,desc},extra||{});}
+const MOVES={
+  tackle:MV('撞击','null',40,0,'基础物理攻击'),
+  leaf:MV('明叶斩','wood',45,12,'木系斩击，草原域印下觉醒'),
+  leafshield:MV('林间护盾','wood',0,14,'提升自身防御',{buff:'def',amt:1}),
+  ember:MV('火芽冲','fire',45,14,'火系灼烧',{status:'burn',chance:.5}),
+  flamecharge:MV('烈焰冲撞','fire',60,22,'高威力火系，自身略损',{recoil:.15}),
+  splash:MV('潮汐分裂','water',45,14,'水系斩击'),
+  tidalguard:MV('海浪屏障','water',0,14,'提升防御',{buff:'def',amt:1}),
+  rockthrow:MV('裂地投石','earth',50,16,'土系重击'),
+  rockwall:MV('岩墙','earth',0,14,'大幅提升防御',{buff:'def',amt:2}),
+  mirror:MV('镜影分身','illusion',38,14,'幻系攻击并提升闪避(速度)',{buff:'spd',amt:1}),
+  moonblade:MV('月华禁术','illusion',62,24,'高威力幻系'),
+  darkbite:MV('噬梦','dark',55,20,'暗系撕咬',{status:'poison',chance:.4}),
+  dive:MV('暗夜追击','dark',48,16,'暗系先制',{priority:1}),
+  heal:MV('星辉愈纹','light',0,18,'回复自身约40%生命',{heal:.4}),
+};
+
+// ---------------- 异兽种族 ----------------
+// stats: hp,atk,def,spd (1-10 量级)；catchRate 越大越好抓
+const SPECIES={
+  deer:{ name:'烬叶鹿', spr:'deer', types:['wood'], catchRate:180, expRate:1.0,
+    base:{hp:42,atk:46,def:40,spd:52}, learn:{1:['tackle','leaf'],6:['leafshield'],10:['ember']},
+    desc:'温顺的木系先导，额角生有火纹叶。' },
+  fish:{ name:'断潮鲛', spr:'fish', types:['water'], catchRate:150, expRate:1.0,
+    base:{hp:40,atk:48,def:42,spd:50}, learn:{1:['tackle','splash'],6:['tidalguard'],10:['rockthrow']},
+    desc:'背鳍如潮刃的水系斥候。' },
+  rhino:{ name:'熔岩犀', spr:'rhino', types:['fire','earth'], catchRate:70, expRate:1.25,
+    base:{hp:58,atk:56,def:58,spd:30}, learn:{1:['tackle','ember'],8:['flamecharge'],12:['rockthrow']},
+    desc:'熔岩纹理的重装先锋，稀有。' },
+  fox:{ name:'镜月狐', spr:'fox', types:['illusion'], catchRate:90, expRate:1.2,
+    base:{hp:38,atk:52,def:38,spd:60}, learn:{1:['tackle','mirror'],8:['moonblade'],12:['dive']},
+    desc:'尾如半月的幻系术者，机敏。' },
+  lizard:{ name:'岩脊蜥', spr:'lizard', types:['earth'], catchRate:160, expRate:1.0,
+    base:{hp:50,atk:44,def:56,spd:34}, learn:{1:['tackle','rockthrow'],6:['rockwall'],10:['splash']},
+    desc:'背壳嵌岩的坚稳守护者。' },
+  bat:{ name:'幽冥蝠', spr:'bat', types:['dark'], catchRate:80, expRate:1.2,
+    base:{hp:40,atk:54,def:38,spd:58}, learn:{1:['tackle','dive'],8:['darkbite'],12:['mirror']},
+    desc:'翼膜带裂隙纹的暗系猎手。' },
+};
+function statFor(sp,key,level){ const b=SPECIES[sp].base[key];
+  return Math.floor(b*2*level/100)+level+(key==='hp'?10:5); }
+function expNeed(level){ return Math.floor(18*Math.pow(level,1.4)); }
+function makeCreature(sp,level){
+  const s=SPECIES[sp];
+  const c={ sp, name:s.name, types:s.types.slice(), level,
+    hp:0,maxHp:statFor(sp,'hp',level), atk:statFor(sp,'atk',level), def:statFor(sp,'def',level),
+    spd:statFor(sp,'spd',level), exp:0, moves:[], status:null, stages:{atk:0,def:0,spd:0} };
+  c.hp=c.maxHp;
+  for(const lv in s.learn) if(level>=lv) c.moves.push(...s.learn[lv]);
+  c.moves=[...new Set(c.moves)].slice(0,4);
+  c.energy=60; c.maxEnergy=60;
+  return c;
+}
+
+// ---------------- 存档 ----------------
+const SAVE_KEY='starcovenant_slice_v1';
+function saveGame(){ try{
+  localStorage.setItem(SAVE_KEY, JSON.stringify({party:G.party.map(c=>({sp:c.sp,level:c.level,exp:c.exp,hp:c.hp})),
+    px:P.x,py:P.y,kills:G.kills,caught:G.caught}));
+}catch(e){} }
+function loadGame(){ try{ const s=localStorage.getItem(SAVE_KEY); return s?JSON.parse(s):null; }catch(e){ return null; } }
+
+// ---------------- 野外地图 ----------------
+const TILE=16, MAPW=30, MAPH=19;
+// 地图字符：. 草  , 高草(遭遇) = '^' 草域, ~ 水(不可走), , 水畔浅滩 'w'
+//  R 岩(碰撞) / r 岩地(可走遭遇) / T 树(碰撞) / D 暗林(可走遭遇) / S 泉(回复) / P 小径
+const MAP=[];
+(function buildMap(){
+  // 0=草 1=树 2=水 3=岩 4=高草(wood) 5=浅滩(water) 6=岩地(earth) 7=暗林(dark) 8=泉 9=路
+  const m=[];
+  for(let y=0;y<MAPH;y++){ const row=[]; for(let x=0;x<MAPW;x++){
+    let t=0;
+    if(x===0||y===0||x===MAPW-1||y===MAPH-1) t=1;
+    row.push(t); } m.push(row); }
+  const set=(x,y,t)=>{ if(x>0&&y>0&&x<MAPW-1&&y<MAPH-1) m[y][x]=t; };
+  const rect=(x0,y0,x1,y1,t)=>{for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)set(x,y,t);};
+  // 中央小径（路 9）
+  for(let x=2;x<MAPW-2;x++){ set(x,10,9); }
+  // 左上草原高草区
+  rect(3,2,9,7,4);
+  // 右上暗林
+  rect(20,2,27,7,7);
+  // 左下池塘：水 2 + 浅滩 5 环绕
+  rect(3,13,8,16,2);
+  for(let x=2;x<=9;x++){ set(x,12,5); set(x,17,5); }
+  for(let y=12;y<=17;y++){ set(2,y,5); set(9,y,5); }
+  // 右下岩地
+  rect(20,12,27,16,6);
+  for(let x=20;x<=27;x++){ set(x,11,3); }
+  // 散布树与岩（碰撞）
+  const deco=[[12,3,1],[14,5,1],[16,3,1],[11,14,3],[13,15,3],[18,14,1],[15,12,3],[24,9,1],[2,11,1],[26,9,3]];
+  for(const [x,y,t] of deco) set(x,y,t);
+  // 泉水（出生点旁）
+  set(4,10,8); set(5,10,8);
+  MAP.push(...m);
+})();
+function tileAt(tx,ty){ if(tx<0||ty<0||tx>=MAPW||ty>=MAPH) return 1; return MAP[ty][tx]; }
+function solid(t){ return t===1||t===2||t===3; }
+function fieldForTile(t){ return t===4?'grass':t===5||t===2?'water':t===6?'rock':t===7?'dark':null; }
+
+// ---------------- 全局状态 ----------------
+const P={ x:6*TILE+8, y:10*TILE+8, hw:4, hh:4, faceX:1, faceY:0, animT:0, moving:false };
+const G={ state:'title', time:0, party:[], kills:0, caught:0,
+  field:null, wild:null, busy:false, turn:'', logQ:[], msgT:0,
+  camX:0,camY:0, encounterCd:0, shake:0, fx:[], activeIdx:0 };
+const elLog=document.getElementById('log'), elActions=document.getElementById('actions'),
+      elSwitch=document.getElementById('switchMenu'), elUI=document.getElementById('battleUI');
+
+function logMsg(t){ elLog.textContent=t; }
+function startGame(cont){
+  const s=cont?loadGame():null;
+  if(s&&s.party&&s.party.length){
+    G.party=s.party.map(d=>{const c=makeCreature(d.sp,d.level);c.exp=d.exp||0;c.hp=Math.max(1,Math.min(c.maxHp,d.hp??c.maxHp));return c;});
+    P.x=s.px??P.x; P.y=s.py??P.y; G.kills=s.kills||0; G.caught=s.caught||0;
+  } else {
+    G.party=[ makeCreature('deer',5) ];
+    G.party[0].moves=['tackle','leaf','leafshield'];
+  }
+  G.state='field'; elUI.classList.remove('on'); elSwitch.classList.remove('on');
+  G.activeIdx=0;
+  toastMsg('冒险开始！进入草丛、水畔、岩地或暗林遭遇异兽');
+  SFX.heal();
+}
+// 上场异兽：由 G.activeIdx 指定；倒下时返回 null（需调用 autoSwitch 轮换）
+function active(){ const c=G.party[G.activeIdx]; return (c&&c.hp>0)?c:null; }
+function nextAliveIdx(from){ for(let k=1;k<=G.party.length;k++){ const i=(from+k)%G.party.length; if(G.party[i].hp>0)return i; } return -1; }
+// 当前上场倒下时，自动换上第一只存活异兽；无可用返回 false
+function autoSwitch(){
+  if(active())return true;
+  const i=nextAliveIdx(G.activeIdx);
+  if(i<0)return false;
+  G.activeIdx=i; const c=G.party[i];
+  toastMsg(`${c.name} 顶上战场！`); SFX.move();
+  return true;
+}
+
+// ---------------- 输入 ----------------
+const keys={};
+addEventListener('keydown',ev=>{
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(ev.key))ev.preventDefault();
+  keys[ev.code]=true;
+  if(G.state==='title'){ if(ev.code==='Enter'||ev.code==='Digit1') startGame(!!loadGame()); if(ev.code==='Digit2'&&loadGame()) startGame(true); }
+  else if(G.state==='battle'&&!G.busy){
+    if(ev.code>='Digit1'&&ev.code<='Digit4'){ const i=+ev.code.slice(-1)-1; const btns=elActions.querySelectorAll('.act.skill'); if(btns[i])btns[i].click(); }
+    if(ev.code==='KeyC') actSeal();
+    if(ev.code==='KeyP') actItem();
+    if(ev.code==='KeyS') toggleSwitch();
+    if(ev.code==='KeyF') actFlee();
+  }
+});
+addEventListener('keyup',ev=>keys[ev.code]=false);
+cv.addEventListener('click',()=>{ if(G.state==='title') startGame(!!loadGame()); });
+
+// ---------------- 野外更新 ----------------
+function isSolidPx(px,py){ const tx=Math.floor(px/TILE),ty=Math.floor(py/TILE); return solid(tileAt(tx,ty)); }
+function moveEntity(e,dx,dy){
+  const test=(x,y)=>isSolidPx(x-e.hw,y-e.hh)||isSolidPx(x+e.hw,y-e.hh)||isSolidPx(x-e.hw,y+e.hh)||isSolidPx(x+e.hw,y+e.hh);
+  if(!test(e.x+dx,e.y))e.x+=dx;
+  if(!test(e.x,e.y+dy))e.y+=dy;
+}
+function updateField(dt){
+  G.encounterCd=Math.max(0,G.encounterCd-dt);
+  let dx=0,dy=0;
+  if(keys.KeyW||keys.ArrowUp)dy-=1; if(keys.KeyS||keys.ArrowDown)dy+=1;
+  if(keys.KeyA||keys.ArrowLeft)dx-=1; if(keys.KeyD||keys.ArrowRight)dx+=1;
+  P.moving=false;
+  if(dx||dy){
+    if(dx&&dy){dx*=.7071;dy*=.7071;}
+    if(dx)P.faceX=Math.sign(dx); if(dy)P.faceY=dy?Math.sign(dy):P.faceY;
+    if(!dx)P.faceX=0;
+    moveEntity(P,dx*92*dt,dy*92*dt); P.animT+=dt; P.moving=true;
+    // 泉水回复
+    const tt=tileAt(Math.floor(P.x/TILE),Math.floor(P.y/TILE));
+    if(tt===8){
+      let healed=false;
+      for(const c of G.party) if(c.hp<c.maxHp||c.energy<c.maxEnergy){c.hp=c.maxHp;c.energy=c.maxEnergy;healed=true;}
+      if(healed){ toastMsg('绿泉涌动——全队生命与契约能量已回复！'); SFX.heal(); saveGame(); }
+    }
+    // 遭遇判定
+    const f=fieldForTile(tt);
+    if(f&&G.encounterCd<=0&&Math.random()<0.10){ startBattle(f); }
+  }
+  // 相机
+  G.camX+=(P.x-W/2-G.camX)*Math.min(1,8*dt);
+  G.camY+=(P.y-H/2-G.camY)*Math.min(1,8*dt);
+  G.camX=Math.max(0,Math.min(MAPW*TILE-W,G.camX));
+  G.camY=Math.max(0,Math.min(MAPH*TILE-H,G.camY));
+}
+
+// ---------------- 战斗流程 ----------------
+function startBattle(fieldKey){
+  const f=FIELDS[fieldKey]; G.field=f; G.encounterCd=1.2;
+  const pool=f.enc; const sp=pool[Math.floor(Math.random()*pool.length)];
+  const lvl=Math.max(3, Math.round((G.party[0].level)+ (Math.random()*3-1)) );
+  G.wild=makeCreature(sp,lvl);
+  G.state='battle'; G.busy=true; G.shake=0;
+  if(!active()) G.activeIdx=nextAliveIdx(G.activeIdx);
+  if(G.activeIdx<0)G.activeIdx=0;
+  elUI.classList.add('on'); elSwitch.classList.remove('on');
+  logMsg(`【${f.name}】域印：${TYPE_CN[f.dom]}系增幅！野生的 ${G.wild.name}（Lv.${lvl}）出现了！`);
+  SFX.enc(); G.shake=.4;
+  setTimeout(()=>{ G.busy=false; renderActions(); },900);
+}
+function endBattle(victory){
+  G.busy=true;
+  if(victory){ SFX.win(); }
+  setTimeout(()=>{
+    G.wild=null; G.state='field'; elUI.classList.remove('on'); elSwitch.classList.remove('on');
+    G.encounterCd=1.0; saveGame();
+  }, victory?1400:500);
+}
+function grantExp(amount,fromCatch){
+  const me=active(); if(!me)return;
+  me.exp+=amount; toastMsg(`${me.name} 获得 ${amount} 经验！`);
+  while(me.exp>=expNeed(me.level)){
+    me.exp-=expNeed(me.level); me.level++;
+    const nh=statFor(me.sp,'hp',me.level),na=statFor(me.sp,'atk',me.level),
+          nd=statFor(me.sp,'def',me.level),ns=statFor(me.sp,'spd',me.level);
+    me.maxHp=nh; me.hp=nh; me.atk=na; me.def=nd; me.spd=ns;
+    // 学习新技能
+    for(const lv in SPECIES[me.sp].learn) if(+lv===me.level){
+      for(const mv of SPECIES[me.sp].learn[lv]) if(!me.moves.includes(mv)){
+        if(me.moves.length<4) me.moves.push(mv);
+        toastMsg(`★ ${me.name} 升到 Lv.${me.level}，学会 ${MOVES[mv].name}！`);
+      }
+    }
+    if(!/学会/.test(elLog.textContent)) toastMsg(`★ ${me.name} 升到 Lv.${me.level}！`);
+    SFX.eff();
+  }
+}
+// 玩家行动
+function playerMove(mvKey){
+  if(G.busy)return;
+  const me=active(), mv=MOVES[mvKey];
+  if(!me||!mv)return;
+  if(me.energy<mv.cost){ toastMsg('契约能量不足！'); SFX.fail(); return; }
+  G.busy=true; elSwitch.classList.remove('on');
+  me.energy-=mv.cost;
+  // 先按速度决定回合顺序（含优先级）
+  queueTurn({who:'player',mv:mvKey});
+}
+function queueTurn(action){
+  const me=active(), fo=G.wild;
+  // 玩家使用技能；敌方随机
+  const myPrio=(MOVES[action.mv].priority||0);
+  const foMv=fo.moves[Math.floor(Math.random()*fo.moves.length)];
+  const order=[];
+  const meEff=me.spd*(1+me.stages.spd*0.15);
+  const foEff=fo.spd;
+  const meFirst = myPrio>0 ? true : (meEff>=foEff);
+  order.push({side:'me',mv:action.mv});
+  order.push({side:'fo',mv:foMv});
+  if(!meFirst) order.reverse();
+  runOrder(order,0);
+}
+function runOrder(order,i){
+  if(i>=order.length){ // 回合结束结算
+    tickStatus(active()); tickStatus(G.wild);
+    if(checkBattleEnd())return;
+    // 回复少量能量
+    const me=active(); if(me){me.energy=Math.min(me.maxEnergy,me.energy+6);}
+    G.busy=false; renderActions(); return;
+  }
+  const step=order[i];
+  const actor = step.side==='me'?active():G.wild;
+  const target= step.side==='me'?G.wild:active();
+  if(!actor||actor.hp<=0||!target||target.hp<=0){ runOrder(order,i+1); return; }
+  // 冻结跳过
+  if(actor.status==='freeze'&&Math.random()<0.5){ toastMsg(`${actor.name} 被冻住了，无法行动！`);
+    setTimeout(()=>runOrder(order,i+1),600); return; }
+  performMove(actor,target,MOVES[step.mv],step.side==='me',()=>runOrder(order,i+1));
+}
+function effSpd(c){ return c.spd*(1+(c.stages&&c.stages.spd?c.stages.spd:0)*0.15); }
+function performMove(actor,target,mv,byPlayer,done){
+  const fieldDom=G.field.dom;
+  if(mv.buff){ actor.stages[mv.buff]=Math.min(3,(actor.stages[mv.buff]||0)+mv.amt);
+    toastMsg(`${actor.name} 使用 ${mv.name}，${mv.buff==='def'?'防御':mv.buff==='spd'?'速度':'攻击'}提升！`);
+    SFX.eff(); setTimeout(done,700); return; }
+  if(mv.heal){ const h=Math.floor(actor.maxHp*mv.heal); actor.hp=Math.min(actor.maxHp,actor.hp+h);
+    toastMsg(`${actor.name} 使用 ${mv.name}，回复 ${h} 生命！`);
+    addFx(actor, byPlayer?'#9fd8ff':'#b07fe8'); SFX.heal(); setTimeout(done,750); return; }
+  // 伤害技
+  const atkType = mv.type==='null' ? actor.types[0] : mv.type;
+  const defType = target.types[0];
+  let power=mv.power, stab= actor.types.includes(mv.type)?1.3:1;
+  let fieldBonus = (mv.type===fieldDom)?1.3:1;
+  const typeM=typeMulti(mv.type==='null'?actor.types[0]:mv.type, defType);
+  const atkStat=actor.atk*(1+(actor.stages.atk||0)*0.15);
+  const defStat=target.def*(1+(target.stages.def||0)*0.15);
+  let dmg=Math.floor((((2*actor.level/5+2)*power*atkStat/Math.max(1,defStat))/50+2));
+  dmg=Math.max(1,Math.floor(dmg*stab*fieldBonus*typeM*(0.85+Math.random()*0.15)));
+  // 觉醒：同系异兽在对应域印
+  const awakened = actor.types.includes(fieldDom);
+  target.hp=Math.max(0,target.hp-dmg);
+  G.shake=.25; SFX.hit();
+  addFx(target, TYPE_COLOR[atkType]||'#fff');
+  if(target===G.wild) G.wildFlash=.12; else G.meFlash=.12;
+  let msg=`${actor.name} 使用 ${mv.name}！造成 ${dmg} 点伤害`;
+  if(typeM>1)msg+='（效果绝佳！）'; else if(typeM<1)msg+='（效果不佳…）';
+  if(fieldBonus>1)msg+=' 域印增幅！';
+  if(awakened)msg+=' 觉醒！';
+  toastMsg(msg);
+  if(mv.recoil){ const r=Math.floor(actor.maxHp*mv.recoil); actor.hp=Math.max(1,actor.hp-r); }
+  if(mv.status&&Math.random()<(mv.chance||0)&&!target.status) target.status=mv.status;
+  setTimeout(done,750);
+}
+function tickStatus(c){ if(!c||c.hp<=0)return;
+  if(c.status==='burn'||c.status==='poison'){ const d=Math.max(1,Math.floor(c.maxHp/12));
+    c.hp=Math.max(0,c.hp-d); toastMsg(`${c.name} 受到${c.status==='burn'?'灼烧':'中毒'}伤害 ${d}`); }
+}
+function checkBattleEnd(){
+  if(G.wild.hp<=0){
+    G.kills++;
+    const exp=Math.floor(20*G.wild.level*SPECIES[G.wild.sp].expRate);
+    toastMsg(`野生 ${G.wild.name} 被击败！`);
+    grantExp(exp,false);
+    endBattle(true); return true;
+  }
+  // 上场异兽倒下：若还有存活异兽则自动轮换，否则战败
+  if(!active()){
+    if(autoSwitch()){ renderSwitch(); return false; }
+    toastMsg('你的异兽全部失去战斗能力……');
+    // 失败：回到泉水，全队复活为半血
+    setTimeout(()=>{ for(const c of G.party){c.hp=Math.max(1,Math.floor(c.maxHp*.5));c.energy=c.maxEnergy;c.status=null;}
+      G.activeIdx=0; P.x=6*TILE+8;P.y=10*TILE+8; },900);
+    endBattle(false); return true;
+  }
+  return false;
+}
+// 契约（捕捉）
+function actSeal(){
+  if(G.busy)return; G.busy=true; elSwitch.classList.remove('on');
+  const fo=G.wild;
+  const rate=SPECIES[fo.sp].catchRate;
+  const hpFactor=1-(fo.hp/fo.maxHp)*0.65; // 血越低越好抓
+  const statusBonus=fo.status?1.25:1;
+  const chance=Math.min(0.95,(rate/255)*hpFactor*statusBonus*1.6);
+  SFX.seal();
+  toastMsg('投出契约之印……');
+  setTimeout(()=>{
+    if(Math.random()<chance){
+      G.caught++;
+      toastMsg(`★ 契约成功！${fo.name}（Lv.${fo.level}）加入了队伍！`);
+      SFX.win();
+      if(G.party.length<6){ G.party.push(fo); }
+      else { toastMsg('队伍已满，契约之力转化为经验。'); grantExp(Math.floor(15*fo.level),true); }
+      saveGame(); endBattle(true);
+    } else {
+      toastMsg('……印记被挣脱了！'); SFX.fail(); G.shake=.2;
+      // 敌方反击一回合
+      const me=active();
+      setTimeout(()=>{ if(me&&fo.hp>0){ const fmv=MOVES[fo.moves[Math.floor(Math.random()*fo.moves.length)]];
+        performMove(fo,me,fmv,false,()=>{ tickStatus(me); if(checkBattleEnd())return;
+          me.energy=Math.min(me.maxEnergy,me.energy+6); G.busy=false; renderActions(); }); }
+        else { G.busy=false; renderActions(); } },700);
+    }
+  },900);
+}
+function actItem(){
+  if(G.busy)return; const me=active(); if(!me)return;
+  G.busy=true; elSwitch.classList.remove('on');
+  const h=Math.floor(me.maxHp*0.4); me.hp=Math.min(me.maxHp,me.hp+h); me.status=null;
+  toastMsg(`使用星辉药剂，${me.name} 回复 ${h} 生命并解除异常！`);
+  SFX.heal(); addFx(me,'#9fd8ff');
+  setTimeout(()=>{ const fo=G.wild;
+    const fmv=MOVES[fo.moves[Math.floor(Math.random()*fo.moves.length)]];
+    performMove(fo,me,fmv,false,()=>{ tickStatus(me); if(checkBattleEnd())return;
+      me.energy=Math.min(me.maxEnergy,me.energy+6); G.busy=false; renderActions(); }); },750);
+}
+function actFlee(){
+  if(G.busy)return;
+  if(Math.random()<0.8){ toastMsg('成功脱离了战斗！'); SFX.move(); endBattle(false); }
+  else { toastMsg('没能逃走！'); G.busy=true;
+    const me=active(),fo=G.wild;
+    setTimeout(()=>{ const fmv=MOVES[fo.moves[Math.floor(Math.random()*fo.moves.length)]];
+      performMove(fo,me,fmv,false,()=>{ tickStatus(me); if(checkBattleEnd())return;
+        G.busy=false; renderActions(); }); },500); }
+}
+function toggleSwitch(){
+  if(G.busy)return;
+  elSwitch.classList.toggle('on'); renderSwitch();
+}
+function switchTo(idx){
+  const c=G.party[idx];
+  if(!c||c.hp<=0||idx===G.activeIdx){ elSwitch.classList.remove('on'); return; }
+  G.busy=true; elSwitch.classList.remove('on');
+  G.activeIdx=idx; renderSwitch();
+  toastMsg(`换上了 ${c.name}！`); SFX.move();
+  setTimeout(()=>{ const me=active(),fo=G.wild;
+    const fmv=MOVES[fo.moves[Math.floor(Math.random()*fo.moves.length)]];
+    performMove(fo,me,fmv,false,()=>{ tickStatus(me); if(checkBattleEnd())return;
+      me.energy=Math.min(me.maxEnergy,me.energy+6); G.busy=false; renderActions(); }); },600);
+}
+// ---------------- 战斗 UI ----------------
+function renderActions(){
+  const me=active(); elActions.innerHTML='';
+  const mk=(label,sub,fn,cls)=>{ const b=document.createElement('button');
+    b.className='act '+(cls||''); b.innerHTML=label+(sub?`<span class="ty">${sub}</span>`:'');
+    b.disabled=G.busy; b.onclick=fn; elActions.appendChild(b); return b; };
+  if(me) me.moves.forEach((k,i)=>{ const mv=MOVES[k];
+    const b=mk(mv.name,`${mv.cost?mv.cost+'能 · ':''}${mv.type==='null'?'无系':TYPE_CN[mv.type]+'系'}${mv.power?' · 威'+mv.power:''}`,
+      ()=>playerMove(k),'skill primary');
+    if(me.energy<mv.cost)b.disabled=true; });
+  mk('契约之印','捕捉',actSeal,'seal');
+  mk('星辉药剂','回复40%',actItem);
+  mk('切换队伍','S',toggleSwitch);
+  mk('逃跑','F',actFlee);
+  renderSwitch();
+}
+function renderSwitch(){
+  elSwitch.innerHTML='<div style="font-size:11px;color:var(--dim);padding:2px 4px 4px">选择上场异兽：</div>';
+  G.party.forEach((c,i)=>{
+    const row=document.createElement('div');
+    row.className='partyRow'+(c.hp<=0?' dead':'')+(i===G.activeIdx?' active':'');
+    row.innerHTML=`<span class="pname">${c.name} Lv.${c.level}</span>
+      <span class="bar"><i style="width:${Math.max(0,c.hp/c.maxHp*100)}%;background:${c.hp/c.maxHp>.3?'#5ad45c':'#e8563c'}"></i></span>
+      <span class="php">${Math.ceil(c.hp)}/${c.maxHp}</span>`;
+    row.onclick=()=>switchTo(i);
+    elSwitch.appendChild(row);
+  });
+}
+function toastMsg(t){ elLog.textContent=t; }
+
+// ---------------- 特效粒子 ----------------
+function addFx(c,color){ for(let i=0;i<8;i++){ const a=Math.random()*Math.PI*2,s=40+Math.random()*50;
+  G.fx.push({x:c._sx||0,y:c._sy||0,vx:Math.cos(a)*s,vy:Math.sin(a)*s,t:0,life:.4,color}); } }
+
+// ---------------- 渲染 ----------------
+function drawSpr(spr,x,y,flip){ ctx.save(); ctx.translate(Math.round(x),Math.round(y));
+  if(flip)ctx.scale(-1,1); ctx.drawImage(spr,-(spr.width>>1),-spr.height+2); ctx.restore(); }
+function render(){
+  ctx.fillStyle='#11131c'; ctx.fillRect(0,0,W,H);
+  if(G.state==='title'){ drawTitle(); return; }
+  if(G.state==='field'){ drawField(); drawFieldHUD(); return; }
+  if(G.state==='battle'){ drawBattle(); }
+}
+function drawTitle(){
+  ctx.fillStyle='#141a30'; ctx.fillRect(0,0,W,H);
+  for(let i=0;i<50;i++){ ctx.fillStyle=i%2?'#3a4266':'#525a80';
+    ctx.fillRect((i*53)%W,(i*31)%(H*0.7),1,1); }
+  ctx.font='bold 26px monospace'; ctx.textAlign='center';
+  ctx.fillStyle='#ffd76e'; ctx.fillText('星 域 契 约',W/2,90);
+  ctx.font='12px monospace'; ctx.fillStyle='#9aa1bd'; ctx.fillText('裂 隙 纪 元 · 垂直切片',W/2,116);
+  // 异兽展示
+  const show=['deer','fox','rhino','fish','lizard','bat'];
+  show.forEach((s,i)=>{ const x=70+i*68; ctx.save(); ctx.translate(x,190); ctx.scale(3,3);
+    ctx.drawImage(SPR[SPECIES[s].spr],-6,-8); ctx.restore(); });
+  const has=!!loadGame();
+  ctx.font='12px monospace';
+  ctx.fillStyle=Math.sin(G.time*4)>-.3?'#eef2ff':'#6a7089';
+  ctx.fillText(has?'[ Enter ] 继续冒险':'[ Enter ] 开始冒险',W/2,250);
+  ctx.font='9px monospace'; ctx.fillStyle='#565c78';
+  ctx.fillText('WASD 移动 · 战斗点击按钮 / 数字键',W/2,275);
+}
+const TILE_COLOR={0:'#2f5029',1:'#22301f',2:'#26405c',3:'#4a3a2a',4:'#35682a',5:'#2f5570',6:'#5a4630',7:'#2a2438',8:'#2f6b5a',9:'#6b5a3a'};
+function drawField(){
+  const shx=G.shake>0?(Math.random()-.5)*4*G.shake:0, shy=G.shake>0?(Math.random()-.5)*4*G.shake:0;
+  const cx=Math.round(G.camX+shx),cy=Math.round(G.camY+shy);
+  ctx.save(); ctx.translate(-cx,-cy);
+  const x0=Math.floor(cx/TILE),y0=Math.floor(cy/TILE),x1=Math.ceil((cx+W)/TILE),y1=Math.ceil((cy+H)/TILE);
+  for(let ty=y0;ty<=y1;ty++)for(let tx=x0;tx<=x1;tx++){
+    const t=tileAt(tx,ty);
+    ctx.fillStyle=TILE_COLOR[t]||'#2f5029';
+    ctx.fillRect(tx*TILE,ty*TILE,TILE,TILE);
+    if((tx+ty)%2===0){ctx.fillStyle='rgba(0,0,0,0.06)';ctx.fillRect(tx*TILE,ty*TILE,TILE,TILE);}
+    if(t===4){ // 高草
+      ctx.fillStyle='#4e9438'; for(let k=0;k<3;k++){const gx=tx*TILE+3+k*5;
+        ctx.fillRect(gx,ty*TILE+6,1,7);ctx.fillRect(gx+1,ty*TILE+5,1,8);} }
+    if(t===7){ ctx.fillStyle='#3a3050'; ctx.fillRect(tx*TILE+3,ty*TILE+8,2,6);ctx.fillRect(tx*TILE+9,ty*TILE+7,2,7); }
+  }
+  // 装饰实体（树/岩/泉）按 y 排序
+  const ents=[];
+  for(let ty=0;ty<MAPH;ty++)for(let tx=0;tx<MAPW;tx++){
+    const t=tileAt(tx,ty);
+    if(t===1) ents.push({y:ty*TILE,fn:()=>drawSpr(SPR.tree,tx*TILE+8,ty*TILE+14)});
+    if(t===3){ /* 岩 */ ents.push({y:ty*TILE,fn:()=>{ctx.fillStyle='#6b604f';ctx.fillRect(tx*TILE+2,ty*TILE+6,12,8);ctx.fillStyle='#8a8070';ctx.fillRect(tx*TILE+3,ty*TILE+5,8,4);}}); }
+    if(t===8) ents.push({y:ty*TILE,fn:()=>drawSpr(SPR.spring,tx*TILE+8,ty*TILE+12)});
+  }
+  ents.push({y:P.y,fn:()=>{ const bob=P.moving?Math.abs(Math.sin(P.animT*12))*1.5:0;
+    drawSpr(SPR.player,P.x,P.y-bob+3,P.faceX<0); }});
+  ents.sort((a,b)=>a.y-b.y); for(const e of ents)e.fn();
+  ctx.restore();
+}
+function drawFieldHUD(){
+  const me=active();
+  ctx.textAlign='left'; ctx.font='10px monospace';
+  ctx.fillStyle='rgba(12,14,22,.8)'; ctx.fillRect(8,8,150,me?44:20);
+  ctx.fillStyle='#ffd76e'; ctx.fillText(`契约 ${G.caught} · 讨伐 ${G.kills}`,14,22);
+  if(me){ ctx.fillStyle='#e8eaf2'; ctx.fillText(`${me.name} Lv.${me.level}  HP ${Math.ceil(me.hp)}/${me.maxHp}`,14,36);
+    ctx.fillStyle='#26262e'; ctx.fillRect(14,40,130,5);
+    ctx.fillStyle=me.hp/me.maxHp>.3?'#5ad45c':'#e8563c'; ctx.fillRect(14,40,130*Math.max(0,me.hp/me.maxHp),5); }
+  // 所在域印提示
+  const f=fieldForTile(tileAt(Math.floor(P.x/TILE),Math.floor(P.y/TILE)));
+  if(f){ ctx.textAlign='center'; ctx.fillStyle='rgba(12,14,22,.7)';
+    ctx.fillRect(W/2-70,H-24,140,16);
+    ctx.fillStyle=TYPE_COLOR[FIELDS[f].dom]; ctx.fillText(`域印：${FIELDS[f].name}`,W/2,H-13); }
+}
+function drawBattle(){
+  const f=G.field, fo=G.wild, me=active();
+  // 背景
+  const grd=ctx.createLinearGradient(0,0,0,H);
+  grd.addColorStop(0,'#3a4a6a'); grd.addColorStop(1,f.tint);
+  ctx.fillStyle=grd; ctx.fillRect(0,0,W,H);
+  // 域印光环
+  ctx.save(); ctx.globalAlpha=.25; ctx.fillStyle=TYPE_COLOR[f.dom];
+  ctx.beginPath(); ctx.arc(W-90,90,70,0,7); ctx.fill(); ctx.restore();
+  ctx.textAlign='center'; ctx.font='bold 11px monospace'; ctx.fillStyle=TYPE_COLOR[f.dom];
+  ctx.fillText(`◆ ${f.name} · ${TYPE_CN[f.dom]}系域印 ◆`,W/2,20);
+  // 敌方（右上）
+  if(fo){ const ex=W-100, ey=120;
+    fo._sx=ex; fo._sy=ey;
+    const flash=G.wildFlash>0;
+    drawSpr(flash?SPR[SPECIES[fo.sp].spr+'W']:SPR[SPECIES[fo.sp].spr],ex,ey+ (fo.types.includes(f.dom)?Math.sin(G.time*6)*2:0),false);
+    if(fo.types.includes(f.dom)){ ctx.fillStyle=TYPE_COLOR[f.dom]; ctx.globalAlpha=.5+Math.sin(G.time*6)*.3;
+      ctx.fillText('觉醒',ex,ey-46); ctx.globalAlpha=1; }
+    drawHpCard(ex-55,40,fo,true);
+  }
+  // 我方（左下）
+  if(me){ const mx=110, my=230;
+    me._sx=mx; me._sy=my;
+    const flash=G.meFlash>0;
+    drawSpr(flash?SPR[SPECIES[me.sp].spr+'W']:SPR[SPECIES[me.sp].spr],mx,my,true);
+    if(me.types.includes(f.dom)){ ctx.fillStyle=TYPE_COLOR[f.dom]; ctx.globalAlpha=.5+Math.sin(G.time*6)*.3;
+      ctx.textAlign='center'; ctx.fillText('觉醒',mx,my-52); ctx.globalAlpha=1; }
+    drawHpCard(20,150,me,false);
+  }
+  // 粒子
+  for(let i=G.fx.length-1;i>=0;i--){const p=G.fx[i];p.t+=1/60;p.x+=p.vx/60;p.y+=p.vy/60;
+    ctx.globalAlpha=1-p.t/p.life;ctx.fillStyle=p.color;ctx.fillRect(Math.round(p.x),Math.round(p.y),2,2);
+    if(p.t>p.life)G.fx.splice(i,1);}
+  ctx.globalAlpha=1;
+  G.wildFlash=Math.max(0,(G.wildFlash||0)-1/60);
+  G.meFlash=Math.max(0,(G.meFlash||0)-1/60);
+  G.shake=Math.max(0,G.shake-1/60);
+}
+function drawHpCard(x,y,c,enemy){
+  ctx.textAlign='left'; ctx.font='9px monospace';
+  ctx.fillStyle='rgba(10,12,20,.82)'; ctx.fillRect(x,y,110,enemy?34:46);
+  ctx.fillStyle='#e8eaf2'; ctx.fillText(`${c.name} Lv.${c.level}`,x+5,y+12);
+  ctx.fillStyle='#000'; ctx.fillRect(x+5,y+17,100,5);
+  ctx.fillStyle=c.hp/c.maxHp>.3?'#5ad45c':'#e8563c'; ctx.fillRect(x+5,y+17,100*Math.max(0,c.hp/c.maxHp),5);
+  if(!enemy){ ctx.fillStyle='#000'; ctx.fillRect(x+5,y+27,100,4);
+    ctx.fillStyle='#56a6e8'; ctx.fillRect(x+5,y+27,100*(c.energy/c.maxEnergy),4);
+    ctx.fillStyle='#9aa1bd'; ctx.fillText(`HP ${Math.ceil(c.hp)}/${c.maxHp}`,x+5,y+42); }
+  if(c.status){ ctx.fillStyle=c.status==='burn'?'#e8563c':c.status==='poison'?'#b07fe8':'#9fd8ff';
+    ctx.fillText({burn:'灼烧',poison:'中毒',freeze:'冰冻'}[c.status],x+85,y+12); }
+}
+
+// ---------------- 主循环 ----------------
+let last=performance.now();
+function loop(now){
+  const dt=Math.min(0.05,(now-last)/1000); last=now; G.time+=dt;
+  if(G.state==='field') updateField(dt);
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
