@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RULONG · 作品集 | Player One</title>
+<meta name="description" content="像素风个人作品集：独立游戏《周目勇者》、《遮天》同人小说与更多进行中的冒险。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='2' y='3' width='5' height='4' fill='%23e8483c'/><rect x='9' y='3' width='5' height='4' fill='%23e8483c'/><rect x='1' y='5' width='14' height='4' fill='%23e8483c'/><rect x='3' y='9' width='4' height='2' fill='%23e8483c'/><rect x='9' y='9' width='4' height='2' fill='%23e8483c'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=ZCOOL+QingKe+HuangYou&display=swap" rel="stylesheet">
+<style>
+/* ============ 像素作品集 · PICO-8 风格调色板 ============ */
+:root {
+  --bg: #1a1c2c; --bg2: #22243a; --panel: #29366f; --panel2: #3b5dc9;
+  --ink: #f4f4f4; --dim: #94b0c2;
+  --yellow: #ffcd75; --red: #e8483c; --green: #38b764; --cyan: #73eff7;
+  --blue: #41a6f6; --pink: #ef7d57; --purple: #a576f7;
+  --px: 4px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'ZCOOL QingKe HuangYou', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 18px; line-height: 1.7;
+  overflow-x: hidden;
+}
+::selection { background: var(--yellow); color: var(--bg); }
+.en { font-family: 'Press Start 2P', monospace; }
+
+/* CRT 扫描线 */
+body::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 999;
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.12) 3px 4px);
+}
+/* 闪烁加载光标 */
+.cursor { display: inline-block; width: .55em; height: 1em; background: var(--yellow);
+  vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ============ 导航 ============ */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(26,28,44,.92); border-bottom: var(--px) solid var(--panel2);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px; backdrop-filter: blur(2px);
+}
+nav .logo { font-size: 12px; color: var(--yellow); text-decoration: none;
+  text-shadow: 2px 2px 0 #7a5b13; }
+nav ul { display: flex; gap: 4px; list-style: none; flex-wrap: wrap; }
+nav a.navlink {
+  color: var(--dim); text-decoration: none; font-size: 16px; padding: 4px 12px;
+  border: var(--px) solid transparent;
+}
+nav a.navlink::before { content: '▸'; opacity: 0; margin-right: 4px; color: var(--yellow); }
+nav a.navlink:hover, nav a.navlink.active { color: var(--ink); background: var(--panel); }
+nav a.navlink:hover::before, nav a.navlink.active::before { opacity: 1; }
+
+/* ============ 通用 ============ */
+section { max-width: 960px; margin: 0 auto; padding: 96px 24px 32px; }
+.sec-title { font-size: 14px; color: var(--yellow); margin-bottom: 8px;
+  text-shadow: 3px 3px 0 rgba(0,0,0,.5); letter-spacing: 2px; }
+.sec-sub { color: var(--dim); margin-bottom: 32px; font-size: 16px; }
+.sec-sub::before { content: '═══ '; color: var(--panel2); }
+.sec-sub::after { content: ' ═══'; color: var(--panel2); }
+
+/* 像素边框面板 */
+.panel {
+  background: var(--bg2); border: var(--px) solid var(--panel2);
+  box-shadow: 0 var(--px) 0 var(--panel), var(--px) 0 0 var(--panel),
+    calc(-1 * var(--px)) 0 0 var(--panel), 0 calc(-1 * var(--px)) 0 var(--panel),
+    inset 0 0 0 var(--px) var(--bg2), 6px 6px 0 rgba(0,0,0,.4);
+  padding: 24px;
+}
+/* 入场动画 */
+.reveal { opacity: 0; transform: translateY(24px); transition: opacity .5s, transform .5s; }
+.reveal.in { opacity: 1; transform: none; }
+
+/* ============ HERO ============ */
+#hero {
+  min-height: 100vh; display: flex; flex-direction: column;
+  justify-content: center; align-items: center; text-align: center;
+  position: relative; padding: 24px;
+}
+#stars { position: absolute; inset: 0; z-index: -1; }
+.hero-title { font-size: clamp(26px, 6vw, 52px); color: var(--yellow);
+  text-shadow: 4px 4px 0 var(--red), 8px 8px 0 rgba(0,0,0,.45);
+  letter-spacing: 6px; margin: 24px 0 12px; }
+.hero-sub { color: var(--cyan); font-size: clamp(12px, 2vw, 15px); margin-bottom: 8px; }
+.hero-line { color: var(--dim); min-height: 1.8em; font-size: 17px; }
+.hero-line b { color: var(--ink); }
+.hero-cta { margin-top: 40px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.btn {
+  font-family: inherit; font-size: 18px; color: var(--bg);
+  background: var(--yellow); border: none; padding: 12px 28px; cursor: pointer;
+  box-shadow: 0 6px 0 #b8862e; text-decoration: none; display: inline-block;
+  transition: transform .05s;
+}
+.btn.blue { background: var(--cyan); box-shadow: 0 6px 0 #2a8a8a; }
+.btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b8862e; }
+.btn:hover { filter: brightness(1.1); }
+/* 弹跳像素小人 */
+.hero-char { image-rendering: pixelated; animation: bounce 1.6s steps(2) infinite; }
+@keyframes bounce { 50% { transform: translateY(-6px); } }
+.scroll-hint { position: absolute; bottom: 28px; color: var(--dim); font-size: 12px;
+  animation: float 1.4s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(6px); } }
+
+/* ============ 关于我 ============ */
+.about-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 24px; align-items: start; }
+@media (max-width: 720px) { .about-grid { grid-template-columns: 1fr; } }
+.avatar-box { text-align: center; }
+.avatar-box canvas { image-rendering: pixelated; width: 128px; height: 128px;
+  background: var(--panel); border: var(--px) solid var(--panel2); padding: 12px; }
+.avatar-name { margin-top: 12px; color: var(--yellow); font-size: 13px; }
+.hp-wrap { margin-top: 12px; text-align: left; font-size: 12px; color: var(--dim); }
+.bar { height: 14px; background: #16181f; border: var(--px) solid #16181f; margin: 4px 0 10px; }
+.bar i { display: block; height: 100%; }
+.bar.hp i { width: 92%; background: var(--green); box-shadow: inset 0 -4px 0 rgba(0,0,0,.25); }
+.bar.mp i { width: 88%; background: var(--blue); box-shadow: inset 0 -4px 0 rgba(0,0,0,.25); }
+.about-text p { margin-bottom: 12px; }
+.about-text b { color: var(--yellow); }
+
+/* 技能 = 物品栏 */
+.inv { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin-top: 20px; }
+.slot {
+  border: var(--px) solid var(--panel2); background: var(--panel);
+  padding: 10px 6px; text-align: center; font-size: 14px; color: var(--ink);
+  position: relative; cursor: default; transition: transform .08s;
+}
+.slot:hover { transform: translate(-2px, -2px); border-color: var(--yellow); z-index: 2; }
+.slot .ico { font-size: 20px; display: block; margin-bottom: 4px; }
+.slot .lv { position: absolute; right: 4px; bottom: 2px; font-size: 10px; color: var(--yellow); }
+
+/* ============ 项目 ============ */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+.card { display: flex; flex-direction: column; text-decoration: none; color: var(--ink);
+  transition: transform .1s; position: relative; overflow: hidden; }
+.card:hover { transform: translate(-3px, -3px); border-color: var(--yellow); }
+.card .thumb { height: 120px; margin: -24px -24px 16px; position: relative;
+  border-bottom: var(--px) solid var(--panel2); overflow: hidden; }
+.card .thumb canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.card h3 { font-size: 20px; color: var(--yellow); margin-bottom: 6px; }
+.card .tag { display: inline-block; font-size: 11px; padding: 2px 8px; margin: 2px 4px 8px 0;
+  background: var(--panel); border: 2px solid var(--panel2); color: var(--cyan); }
+.card p { font-size: 15px; color: var(--dim); flex: 1; }
+.card .more { margin-top: 12px; color: var(--yellow); font-size: 14px; }
+.card .more::before { content: '▸ '; }
+.card .status { position: absolute; top: 10px; right: 10px; font-size: 10px;
+  padding: 4px 8px; z-index: 2; }
+.status.live { background: var(--green); color: #06220f; }
+.status.wip { background: var(--yellow); color: #3d2b04; }
+.status.writing { background: var(--pink); color: #2b0d06; }
+
+/* ============ 时间线 ============ */
+.quests { list-style: none; }
+.quest { display: grid; grid-template-columns: 110px 24px 1fr; gap: 8px; margin-bottom: 20px; }
+.quest .date { color: var(--yellow); font-size: 13px; text-align: right; padding-top: 2px; }
+.quest .node { position: relative; display: flex; justify-content: center; }
+.quest .node i { width: 12px; height: 12px; background: var(--cyan); margin-top: 8px;
+  box-shadow: 0 0 0 var(--px) var(--panel2); }
+.quest .node::after { content: ''; position: absolute; top: 20px; bottom: -24px;
+  width: var(--px); background: var(--panel2); }
+.quest:last-child .node::after { display: none; }
+.quest .body h4 { font-size: 17px; margin-bottom: 2px; }
+.quest .body h4 .badge { font-size: 10px; background: var(--panel2); padding: 2px 6px;
+  margin-left: 8px; vertical-align: 2px; }
+.quest .body p { font-size: 15px; color: var(--dim); }
+.quest.done .node i { background: var(--green); }
+.quest.doing .node i { background: var(--yellow); animation: blink 1.2s steps(1) infinite; }
+
+/* ============ 联系 ============ */
+.contact-box { text-align: center; padding: 48px 24px; }
+.contact-box h3 { font-size: 22px; color: var(--yellow); margin-bottom: 8px;
+  text-shadow: 3px 3px 0 rgba(0,0,0,.5); }
+.contact-box .q { color: var(--dim); margin-bottom: 28px; }
+.contact-links { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.contact-links .btn { font-size: 15px; padding: 10px 20px; }
+footer { text-align: center; color: var(--dim); font-size: 11px; padding: 40px 0 32px; }
+footer .heart { color: var(--red); }
+
+/* 彩蛋：彩虹模式 */
+body.rainbow { animation: rainbow 2s linear infinite; }
+@keyframes rainbow {
+  0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="logo en" href="#hero">RULONG.EXE</a>
+  <ul>
+    <li><a class="navlink" href="#about">关于我</a></li>
+    <li><a class="navlink" href="#projects">作品</a></li>
+    <li><a class="navlink" href="#quests">冒险日志</a></li>
+    <li><a class="navlink" href="#contact">联系</a></li>
+  </ul>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header id="hero">
+  <canvas id="stars"></canvas>
+  <!-- 像素小人（勇者） -->
+  <svg class="hero-char" width="96" height="112" viewBox="0 0 12 14" shape-rendering="crispEdges" aria-hidden="true">
+    <g fill="#7d9bc4"><rect x="4" y="0" width="4" height="1"/><rect x="3" y="1" width="6" height="1"/><rect x="6" y="5" width="2" height="1"/></g>
+    <g fill="#55719a"><rect x="3" y="2" width="1" height="3"/><rect x="8" y="2" width="1" height="3"/></g>
+    <g fill="#f2c9a0"><rect x="4" y="2" width="4" height="3"/><rect x="1" y="8" width="1" height="1"/><rect x="10" y="8" width="1" height="1"/></g>
+    <g fill="#26262e"><rect x="4" y="3" width="1" height="1"/><rect x="7" y="3" width="1" height="1"/></g>
+    <g fill="#9aa7c4"><rect x="3" y="6" width="6" height="1"/><rect x="2" y="7" width="8" height="1"/><rect x="3" y="8" width="6" height="1"/></g>
+    <g fill="#68739b"><rect x="4" y="8" width="4" height="1"/><rect x="2" y="8" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/></g>
+    <g fill="#8a5a33"><rect x="3" y="10" width="6" height="1"/></g>
+    <g fill="#3c4257"><rect x="3" y="11" width="2" height="2"/><rect x="7" y="11" width="2" height="2"/></g>
+    <g fill="#26262e"><rect x="3" y="13" width="2" height="1"/><rect x="7" y="13" width="2" height="1"/></g>
+  </svg>
+  <h1 class="hero-title en">RULONG</h1>
+  <div class="hero-sub en">— GAME DEV × STORYTELLER —</div>
+  <p class="hero-line"><span id="typed"></span><span class="cursor"></span></p>
+  <div class="hero-cta">
+    <a class="btn" href="#projects">▶ 查看作品</a>
+    <a class="btn blue" href="#contact">联络我</a>
+  </div>
+  <div class="scroll-hint en">▼ SCROLL ▼</div>
+</header>
+
+<!-- ============ 关于我 ============ -->
+<section id="about">
+  <h2 class="sec-title en">■ PLAYER PROFILE</h2>
+  <p class="sec-sub">关于我 · 玩家档案</p>
+  <div class="about-grid">
+    <div class="panel avatar-box reveal">
+      <canvas id="avatar" width="16" height="16"></canvas>
+      <div class="avatar-name en">PLAYER_1 · RULONG</div>
+      <div class="hp-wrap">
+        HP<span class="bar hp"><i></i></span>
+        MP<span class="bar mp"><i></i></span>
+      </div>
+    </div>
+    <div class="about-text reveal">
+      <p>我是 <b>Rulong</b>，一名同时行走在两个世界的创造者：</p>
+      <p>白天在 <b>Unity 6</b> 里搭建像素世界——正在开发网页端动作 RPG <b>《周目勇者》</b>，从战斗手感、角色成长到存档系统全部亲手打磨；夜晚执笔百万字长篇，让上古大帝的故事一节一节生长。</p>
+      <p>我相信好的作品和好的关卡一样：<b>节奏、反馈与克制</b>，缺一不可。</p>
+      <div class="inv">
+        <div class="slot" title="Unity 6 / WebGL 构建经验"><span class="ico">🎮</span>Unity 6<span class="lv">Lv7</span></div>
+        <div class="slot" title="游戏逻辑、工具脚本"><span class="ico">⚔️</span>C#<span class="lv">Lv6</span></div>
+        <div class="slot" title="原生 Canvas / DOM 游戏原型"><span class="ico">🌐</span>JavaScript<span class="lv">Lv6</span></div>
+        <div class="slot" title="像素美术与关卡设计"><span class="ico">🎨</span>像素美术<span class="lv">Lv5</span></div>
+        <div class="slot" title="LFS / 分支策略 / 协作流"><span class="ico">🔧</span>Git<span class="lv">Lv6</span></div>
+        <div class="slot" title="AI 辅助开发与内容创作"><span class="ico">✨</span>AI 工作流<span class="lv">Lv8</span></div>
+        <div class="slot" title="长篇叙事、世界观架构"><span class="ico">📖</span>小说写作<span class="lv">Lv7</span></div>
+        <div class="slot" title="战斗数值与系统设计"><span class="ico">🗺️</span>关卡设计<span class="lv">Lv5</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 作品 ============ -->
+<section id="projects">
+  <h2 class="sec-title en">■ INVENTORY</h2>
+  <p class="sec-sub">作品展示 · 背包里的冒险</p>
+  <div class="cards">
+
+    <a class="panel card reveal" href="https://github.com/liurulong-ai/zhoumu-hero" target="_blank" rel="noopener">
+      <div class="status wip en">WIP</div>
+      <div class="thumb"><canvas data-scene="game" width="120" height="44"></canvas></div>
+      <h3>周目勇者 <span class="en" style="font-size:10px;color:var(--dim)">ZHOU MU HERO</span></h3>
+      <div>
+        <span class="tag">像素 ARPG</span><span class="tag">Unity 6</span><span class="tag">WebGL</span>
+      </div>
+      <p>单文件可玩原型先行验证玩法：挥砍、翻滚无敌帧、经验升级、掉落拾取与史莱姆王 Boss 战，17 项自动化测试全绿，随后向 Unity 工程迁移。</p>
+      <div class="more">查看仓库</div>
+    </a>
+
+    <a class="panel card reveal" href="#projects" onclick="return false" title="连载中，暂不公开">
+      <div class="status writing en">连载中</div>
+      <div class="thumb"><canvas data-scene="novel" width="120" height="44"></canvas></div>
+      <h3>《遮天》同人长篇</h3>
+      <div>
+        <span class="tag">百万字计划</span><span class="tag">东方玄幻</span><span class="tag">连载</span>
+      </div>
+      <p>以无始大帝证道前的一生为主线的同人长篇：从童年到平定禁地，四条原创角色线并行推进。目标 100 万字，当前持续连载中。</p>
+      <div class="more">章节整理中</div>
+    </a>
+
+    <a class="panel card reveal" href="#hero" title="你正在看的就是它">
+      <div class="status live en">ONLINE</div>
+      <div class="thumb"><canvas data-scene="site" width="120" height="44"></canvas></div>
+      <h3>本作品集 <span class="en" style="font-size:10px;color:var(--dim)">THIS SITE</span></h3>
+      <div>
+        <span class="tag">单文件</span><span class="tag">零依赖</span><span class="tag">CRT 风格</span>
+      </div>
+      <p>纯手写 HTML/CSS/JS 的像素风作品集：扫描线滤镜、打字机、Canvas 星空与场景插画，全部代码绘制，无一张图片资源。</p>
+      <div class="more">正在浏览</div>
+    </a>
+
+  </div>
+</section>
+
+<!-- ============ 时间线 ============ -->
+<section id="quests">
+  <h2 class="sec-title en">■ QUEST LOG</h2>
+  <p class="sec-sub">冒险日志 · 里程碑</p>
+  <ul class="quests">
+    <li class="quest done reveal">
+      <div class="date en">2026.08</div>
+      <div class="node"><i></i></div>
+      <div class="body">
+        <h4>任务开启：像素 RPG 立项 <span class="badge">DONE</span></h4>
+        <p>确定《周目勇者》技术路线：Unity 6 + WebGL；完成 Git/LFS 工作流与项目结构规范。</p>
+      </div>
+    </li>
+    <li class="quest done reveal">
+      <div class="date en">2026.09</div>
+      <div class="node"><i></i></div>
+      <div class="body">
+        <h4>可玩原型 v0.1 通关 <span class="badge">DONE</span></h4>
+        <p>单文件网页原型完成：战斗 / 升级 / Boss / 存档全链路可玩，17 项无头自动化测试全部通过。</p>
+      </div>
+    </li>
+    <li class="quest done reveal">
+      <div class="date en">2026.09</div>
+      <div class="node"><i></i></div>
+      <div class="body">
+        <h4>GitHub 仓库上线 <span class="badge">DONE</span></h4>
+        <p>zhoumu-hero 私有仓库建立，主干 / 开发分支工作流就绪。</p>
+      </div>
+    </li>
+    <li class="quest doing reveal">
+      <div class="date en">进行中</div>
+      <div class="node"><i></i></div>
+      <div class="body">
+        <h4>主线任务 ×2 <span class="badge">IN PROGRESS</span></h4>
+        <p>《周目勇者》Unity 工程搭建与核心系统迁移；《遮天》同人长篇持续连载，向 100 万字推进。</p>
+      </div>
+    </li>
+    <li class="quest reveal">
+      <div class="date en">NEXT</div>
+      <div class="node"><i></i></div>
+      <div class="body">
+        <h4>下一张地图 <span class="badge">LOCKED</span></h4>
+        <p>Unity 版多地图与装备系统；WebGL 构建发布，让所有人都能在浏览器里玩到它。</p>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<!-- ============ 联系 ============ -->
+<section id="contact">
+  <h2 class="sec-title en">■ CONTINUE?</h2>
+  <p class="sec-sub">联系方式 · 存档点</p>
+  <div class="panel contact-box reveal">
+    <h3>─ 冒险仍在继续 ─</h3>
+    <p class="q">想聊聊游戏、故事，或者一起做点什么？<br>选择你的通讯方式：</p>
+    <div class="contact-links">
+      <a class="btn" href="https://github.com/liurulong-ai" target="_blank" rel="noopener">⌨ GitHub</a>
+      <a class="btn blue" href="mailto:hello@example.com">✉ 邮件</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span class="en">© 2026 RULONG</span> · 用 <span class="heart">♥</span> 与 <span class="en" style="font-size:9px">0</span> 张图片资源制作<br>
+  <span style="opacity:.5">彩蛋提示：↑ ↑ ↓ ↓ ← → ← → B A</span>
+</footer>
+
+<script>
+'use strict';
+/* ---------- 打字机 ---------- */
+const LINES = [
+  '我造世界，也写世界。',
+  '游戏在 <b>Unity 6</b> 里生长，故事在夜晚连载。',
+  '当前任务：<b>把 100 万字与一个像素宇宙做完。</b>',
+];
+const typed = document.getElementById('typed');
+let li = 0, ci = 0, del = false;
+function tick() {
+  const line = LINES[li];
+  if (!del) {
+    ci++;
+    typed.innerHTML = line.slice(0, ci);
+    if (ci >= line.length) { del = true; return setTimeout(tick, 2200); }
+  } else {
+    ci--;
+    typed.innerHTML = line.slice(0, ci);
+    if (ci <= 0) { del = false; li = (li + 1) % LINES.length; }
+  }
+  setTimeout(tick, del ? 22 : 90);
+}
+tick();
+
+/* ---------- 星空 ---------- */
+const stars = document.getElementById('stars');
+stars.width = innerWidth; stars.height = innerHeight;
+const sctx = stars.getContext('2d');
+(function drawStars() {
+  let seed = 42;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  sctx.fillStyle = '#1a1c2c'; sctx.fillRect(0, 0, stars.width, stars.height);
+  for (let i = 0; i < 160; i++) {
+    sctx.fillStyle = ['#3a4266', '#525a80', '#5b7553'][Math.floor(rnd() * 3)];
+    sctx.fillRect(Math.floor(rnd() * stars.width), Math.floor(rnd() * stars.height), 2, 2);
+  }
+  // 远山剪影
+  sctx.fillStyle = '#14151f';
+  const h = stars.height;
+  for (let x = 0; x < stars.width; x += 8) {
+    const top = h - 60 - Math.abs(Math.sin(x * 0.008) * 70) - Math.abs(Math.sin(x * 0.03) * 18);
+    sctx.fillRect(x, Math.floor(top / 2) * 2, 8, h - top);
+  }
+})();
+addEventListener('resize', () => { stars.width = innerWidth; stars.height = innerHeight; });
+
+/* ---------- 头像（像素骑士） ---------- */
+(function avatar() {
+  const c = document.getElementById('avatar'), g = c.getContext('2d');
+  const px = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  px(4,0,8,2,'#7d9bc4'); px(3,1,10,3,'#7d9bc4');          // 头盔
+  px(4,4,8,3,'#f2c9a0'); px(5,5,1,1,'#26262e'); px(10,5,1,1,'#26262e'); // 脸
+  px(3,7,10,4,'#9aa7c4'); px(5,8,6,2,'#68739b');          // 铠甲
+  px(1,7,2,3,'#9aa7c4'); px(13,7,2,3,'#9aa7c4');          // 手臂
+  px(0,6,1,5,'#ef7d57'); px(15,6,1,5,'#ef7d57');          // 剑柄
+  px(3,11,10,2,'#8a5a33'); px(4,13,3,3,'#3c4257'); px(9,13,3,3,'#3c4257'); // 腿
+})();
+
+/* ---------- 项目卡片缩略图（三种像素场景） ---------- */
+document.querySelectorAll('canvas[data-scene]').forEach(cv => {
+  const g = cv.getContext('2d'), W = cv.width, H = cv.height;
+  const scene = cv.dataset.scene;
+  const px = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(Math.round(x), Math.round(y), w, h); };
+  if (scene === 'game') {
+    px(0,0,W,H,'#2f5029');
+    for (let y = 0; y < H; y += 8) for (let x = 0; x < W; x += 8) if ((x+y)/8 % 2) px(x,y,8,8,'#2c4a26');
+    px(18,22,10,2,'#7a5230'); px(20,18,6,6,'#7a5230');              // 树干
+    px(12,4,22,16,'#2f6b33'); px(14,8,4,4,'#1f4a24');               // 树冠
+    px(88,24,12,9,'#7fd45c'); px(88,30,12,3,'#4e9438');             // 史莱姆
+    px(90,26,2,3,'#26262e'); px(96,26,2,3,'#26262e');
+    px(56,16,10,14,'#7d9bc4'); px(57,17,8,4,'#f2c9a0'); px(59,18,1,1,'#26262e'); px(63,18,1,1,'#26262e'); // 勇者
+    px(56,20,10,5,'#9aa7c4'); px(54,22,2,4,'#ef7d57');               // 身体+剑
+    px(70,4,30,3,'#ffcd75'); px(70,4,18,3,'#38b764');                // XP条
+  } else if (scene === 'novel') {
+    px(0,0,W,H,'#14151f');
+    for (let i = 0; i < 20; i++) px((i*23)%W,(i*13)%28,2,2,'#525a80');
+    px(30,14,44,30,'#3b2a1a'); px(32,12,40,4,'#5b3b21');             // 书
+    for (let r = 0; r < 5; r++) px(34,20+r*4,36-r,2,'#c9a86a');      // 字行
+    px(70,10,3,34,'#a576f7'); px(66,12,11,3,'#a576f7');              // 光剑/笔
+    px(8,32,14,10,'#1f4a24'); px(10,28,10,8,'#2f6b33');              // 松树
+  } else {
+    px(0,0,W,H,'#22243a');
+    px(8,8,28,20,'#29366f'); px(10,10,24,14,'#1a1c2c'); px(12,12,20,10,'#41a6f6'); // 窗口1
+    px(70,6,40,14,'#29366f'); px(72,8,36,10,'#1a1c2c');
+    for (let i = 0; i < 5; i++) px(74+i*7,10,4,4,['#e8483c','#ffcd75','#38b764','#73eff7','#a576f7'][i]);
+    px(20,36,80,4,'#3b5dc9'); px(24,37,40,2,'#ffcd75');               // 进度条
+  }
+});
+
+/* ---------- 滚动入场 + 导航高亮 ---------- */
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+}), { threshold: .12 });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+const secs = [...document.querySelectorAll('section, header#hero')];
+const links = [...document.querySelectorAll('.navlink')];
+addEventListener('scroll', () => {
+  const y = scrollY + innerHeight * .35;
+  let cur = '';
+  for (const s of secs) if (s.offsetTop <= y) cur = s.id;
+  links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur));
+}, { passive: true });
+
+/* ---------- 彩蛋：魂斗罗秘技 ---------- */
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','KeyB','KeyA'];
+let ki = 0;
+addEventListener('keydown', ev => {
+  ki = (ev.code === KONAMI[ki]) ? ki + 1 : (ev.code === KONAMI[0] ? 1 : 0);
+  if (ki === KONAMI.length) {
+    document.body.classList.add('rainbow');
+    document.title = '★ 30 LIVES ★ RULONG';
+    ki = 0;
+    setTimeout(() => { document.body.classList.remove('rainbow'); document.title = 'RULONG · 作品集 | Player One'; }, 6000);
+  }
+});
+</script>
+</body>
+</html>
