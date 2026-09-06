@@ -1,0 +1,14 @@
+{
+  "name": "shop",
+  "version": "1.0.0",
+  "description": "简约现代风格购物网站：Express 后端 + 原生前端，数据本地 JSON 持久化",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}

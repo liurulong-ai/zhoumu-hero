@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>简集 · JIANJI — 好好生活，慢慢挑选</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <!-- ======================= 顶栏 ======================= -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#/" id="brand-home">
+        <span class="brand-mark">集</span>
+        <span class="brand-text">简集 <i>JIANJI</i></span>
+      </a>
+
+      <form class="search" id="search-form" role="search">
+        <input id="search-input" type="search" placeholder="搜索商品，如「耳机」…" autocomplete="off" />
+        <button type="submit" aria-label="搜索">⌕</button>
+      </form>
+
+      <nav class="topnav">
+        <button class="nav-btn is-active" id="nav-home" data-view="home">逛商店</button>
+        <button class="nav-btn" id="nav-orders" data-view="orders">我的订单</button>
+        <button class="cart-btn" id="cart-btn" aria-label="购物车">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="20" r="1.4"></circle><circle cx="17" cy="20" r="1.4"></circle>
+            <path d="M3 3h2.2l2.2 12.2a1.6 1.6 0 0 0 1.6 1.3h7.9a1.6 1.6 0 0 0 1.6-1.3L21 7H6"></path>
+          </svg>
+          <span class="cart-count" id="cart-count" hidden>0</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- ======================= 首页：商品列表 ======================= -->
+    <section id="view-home" class="view">
+      <div class="hero">
+        <h1>好好生活，慢慢挑选</h1>
+        <p>精选数码、影音与生活好物，满 99 元包邮 · 7 天无理由退换</p>
+      </div>
+
+      <div class="toolbar">
+        <div class="tabs" id="category-tabs" role="tablist">
+          <button class="tab is-active" data-cat="全部">全部</button>
+        </div>
+        <div class="toolbar-right">
+          <span class="result-count" id="result-count"></span>
+          <select id="sort-select" aria-label="排序">
+            <option value="default">默认排序</option>
+            <option value="sales">销量优先</option>
+            <option value="rating">好评优先</option>
+            <option value="price_asc">价格从低到高</option>
+            <option value="price_desc">价格从高到低</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="product-grid" id="product-grid">
+        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+      <div class="empty" id="empty-state" hidden>
+        <p>没有找到相关商品</p>
+        <button class="btn" id="empty-reset">看看全部商品</button>
+      </div>
+    </section>
+
+    <!-- ======================= 商品详情 ======================= -->
+    <section id="view-detail" class="view" hidden>
+      <button class="back-link" id="detail-back">← 返回列表</button>
+      <div class="detail-layout" id="detail-content"></div>
+      <div class="related">
+        <h2 class="section-title">猜你喜欢</h2>
+        <div class="product-grid" id="related-grid"></div>
+      </div>
+    </section>
+
+    <!-- ======================= 我的订单 ======================= -->
+    <section id="view-orders" class="view" hidden>
+      <h1 class="page-title">我的订单</h1>
+      <div id="orders-list"></div>
+      <div class="empty" id="orders-empty" hidden>
+        <p>还没有订单，快去挑选心仪的好物吧</p>
+        <button class="btn" id="orders-go-shop">去逛逛</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>简集 · JIANJI — 前端演示项目 · Express + 原生 JS · 订单数据保存在本地服务器</p>
+  </footer>
+
+  <!-- ======================= 购物车抽屉 ======================= -->
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="drawer" id="cart-drawer" aria-label="购物车" hidden>
+    <div class="drawer-head">
+      <h2 id="drawer-title">购物车</h2>
+      <button class="icon-btn" id="drawer-close" aria-label="关闭">✕</button>
+    </div>
+
+    <!-- 购物车内容 -->
+    <div id="cart-body">
+      <div class="cart-list" id="cart-list"></div>
+      <div class="empty cart-empty" id="cart-empty" hidden>
+        <p>购物车还是空的</p>
+        <button class="btn" id="cart-go-shop">去挑选商品</button>
+      </div>
+    </div>
+
+    <!-- 结算表单 -->
+    <form id="checkout-form" class="checkout-form" hidden novalidate>
+      <label>收货人
+        <input name="name" placeholder="请输入姓名" maxlength="20" required />
+      </label>
+      <label>手机号
+        <input name="phone" type="tel" placeholder="11 位手机号" maxlength="11" required />
+      </label>
+      <label>收货地址
+        <textarea name="address" rows="2" placeholder="省 / 市 / 区 + 详细地址" maxlength="120" required></textarea>
+      </label>
+      <div class="form-error" id="checkout-error" hidden></div>
+    </form>
+
+    <div class="drawer-foot">
+      <div class="subtotal-row">
+        <span>合计（含运费）</span>
+        <span class="subtotal"><b id="cart-total">¥0.00</b><small>包邮</small></span>
+      </div>
+      <div class="foot-btns" id="foot-btns">
+        <button class="btn" id="btn-to-checkout">去结算</button>
+        <button class="btn btn-primary" id="btn-submit-order" hidden>提交订单</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ======================= 下单成功弹层 ======================= -->
+  <div class="modal-scrim" id="modal-scrim" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-icon">🎉</div>
+      <h2 id="modal-title">下单成功！</h2>
+      <p id="modal-text">感谢购买，商家将尽快为你发货。</p>
+      <div class="modal-actions">
+        <button class="btn" id="modal-view-orders">查看订单</button>
+        <button class="btn btn-primary" id="modal-continue">继续逛逛</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
