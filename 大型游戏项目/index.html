@@ -195,6 +195,8 @@ const MOVES={
   darkbite:MV('噬梦','dark',55,20,'暗系撕咬',{status:'poison',chance:.4}),
   dive:MV('暗夜追击','dark',48,16,'暗系先制',{priority:1}),
   heal:MV('星辉愈纹','light',0,18,'回复自身约40%生命',{heal:.4}),
+  voidpulse:MV('裂隙脉冲','dark',58,18,'裂隙能量爆发，强力暗系攻击',{priority:1}),
+  aetherroar:MV('星隙咆哮','light',52,18,'光暗压制，削弱敌人心志',{buff:'spd',amt:1}),
 };
 
 // ---------------- 异兽种族 ----------------
@@ -218,6 +220,9 @@ const SPECIES={
   bat:{ name:'幽冥蝠', spr:'bat', types:['dark'], catchRate:80, expRate:1.2,
     base:{hp:40,atk:54,def:38,spd:58}, learn:{1:['tackle','dive'],8:['darkbite'],12:['mirror']},
     desc:'翼膜带裂隙纹的暗系猎手。' },
+  warden:{ name:'裂隙守卫', spr:'rhino', types:['dark','light'], catchRate:25, expRate:2.2,
+    base:{hp:88,atk:64,def:62,spd:48}, learn:{1:['tackle','voidpulse','aetherroar','heal'],10:['darkbite']},
+    desc:'守在裂隙最深处的古老结界兽。' },
 };
 function statFor(sp,key,level){ const b=SPECIES[sp].base[key];
   return Math.floor(b*2*level/100)+level+(key==='hp'?10:5); }
@@ -238,7 +243,7 @@ function makeCreature(sp,level){
 const SAVE_KEY='starcovenant_slice_v1';
 function saveGame(){ try{
   localStorage.setItem(SAVE_KEY, JSON.stringify({party:G.party.map(c=>({sp:c.sp,level:c.level,exp:c.exp,hp:c.hp})),
-    px:P.x,py:P.y,kills:G.kills,caught:G.caught}));
+    px:P.x,py:P.y,kills:G.kills,caught:G.caught,questStage:G.questStage,bossUnlocked:G.bossUnlocked,bossDefeated:G.bossDefeated}));
 }catch(e){} }
 function loadGame(){ try{ const s=localStorage.getItem(SAVE_KEY); return s?JSON.parse(s):null; }catch(e){ return null; } }
 
@@ -284,7 +289,8 @@ function fieldForTile(t){ return t===4?'grass':t===5||t===2?'water':t===6?'rock'
 const P={ x:6*TILE+8, y:10*TILE+8, hw:4, hh:4, faceX:1, faceY:0, animT:0, moving:false };
 const G={ state:'title', time:0, party:[], kills:0, caught:0,
   field:null, wild:null, busy:false, turn:'', logQ:[], msgT:0,
-  camX:0,camY:0, encounterCd:0, shake:0, fx:[], activeIdx:0 };
+  camX:0,camY:0, encounterCd:0, shake:0, fx:[], activeIdx:0,
+  questStage:0, bossUnlocked:false, bossDefeated:false };
 const elLog=document.getElementById('log'), elActions=document.getElementById('actions'),
       elSwitch=document.getElementById('switchMenu'), elUI=document.getElementById('battleUI');
 
@@ -294,12 +300,15 @@ function startGame(cont){
   if(s&&s.party&&s.party.length){
     G.party=s.party.map(d=>{const c=makeCreature(d.sp,d.level);c.exp=d.exp||0;c.hp=Math.max(1,Math.min(c.maxHp,d.hp??c.maxHp));return c;});
     P.x=s.px??P.x; P.y=s.py??P.y; G.kills=s.kills||0; G.caught=s.caught||0;
+    G.questStage=s.questStage||0; G.bossUnlocked=!!s.bossUnlocked; G.bossDefeated=!!s.bossDefeated;
   } else {
     G.party=[ makeCreature('deer',5) ];
     G.party[0].moves=['tackle','leaf','leafshield'];
+    G.kills=0; G.caught=0; G.questStage=0; G.bossUnlocked=false; G.bossDefeated=false;
   }
   G.state='field'; elUI.classList.remove('on'); elSwitch.classList.remove('on');
   G.activeIdx=0;
+  refreshQuestProgress();
   toastMsg('冒险开始！进入草丛、水畔、岩地或暗林遭遇异兽');
   SFX.heal();
 }
@@ -314,6 +323,13 @@ function autoSwitch(){
   G.activeIdx=i; const c=G.party[i];
   toastMsg(`${c.name} 顶上战场！`); SFX.move();
   return true;
+}
+function refreshQuestProgress(){
+  const prev=G.questStage;
+  if(G.bossDefeated){ G.questStage=3; return; }
+  if(G.kills>=6 && G.caught>=2){ G.questStage=2; G.bossUnlocked=true; if(prev!==2) toastMsg('裂隙门已开启：暗林右上裂隙守卫正在守候！'); }
+  else if(G.kills>=4 && G.caught>=1){ G.questStage=1; G.bossUnlocked=true; }
+  else { G.questStage=0; }
 }
 
 // ---------------- 输入 ----------------
@@ -366,6 +382,10 @@ function updateField(dt){
     // 遭遇判定
     const f=fieldForTile(tt);
     if(f&&G.encounterCd<=0&&Math.random()<0.10){ startBattle(f); }
+    // 裂隙门主线：暗林右上区域，砍到目标后触发守卫战
+    if(G.bossUnlocked && !G.bossDefeated && !G.wild && f==='dark' && P.x>22*TILE && P.y<9*TILE && Math.random()<0.18){
+      startBattle('dark','warden');
+    }
   }
   // 相机
   G.camX+=(P.x-W/2-G.camX)*Math.min(1,8*dt);
@@ -375,16 +395,16 @@ function updateField(dt){
 }
 
 // ---------------- 战斗流程 ----------------
-function startBattle(fieldKey){
+function startBattle(fieldKey, speciesOverride){
   const f=FIELDS[fieldKey]; G.field=f; G.encounterCd=1.2;
-  const pool=f.enc; const sp=pool[Math.floor(Math.random()*pool.length)];
-  const lvl=Math.max(3, Math.round((G.party[0].level)+ (Math.random()*3-1)) );
+  const pool=f.enc; const sp=speciesOverride || pool[Math.floor(Math.random()*pool.length)];
+  const lvl = speciesOverride==='warden' ? Math.max(7, (G.party[0].level || 5) + 2) : Math.max(3, Math.round((G.party[0].level)+ (Math.random()*3-1)) );
   G.wild=makeCreature(sp,lvl);
   G.state='battle'; G.busy=true; G.shake=0;
   if(!active()) G.activeIdx=nextAliveIdx(G.activeIdx);
   if(G.activeIdx<0)G.activeIdx=0;
   elUI.classList.add('on'); elSwitch.classList.remove('on');
-  logMsg(`【${f.name}】域印：${TYPE_CN[f.dom]}系增幅！野生的 ${G.wild.name}（Lv.${lvl}）出现了！`);
+  logMsg(`【${speciesOverride==='warden'?'裂隙门':f.name}】${speciesOverride==='warden' ? '裂隙守卫现身，黑色结界在你脚下震颤！' : `域印：${TYPE_CN[f.dom]}系增幅！野生的 ${G.wild.name}（Lv.${lvl}）出现了！`}`);
   SFX.enc(); G.shake=.4;
   setTimeout(()=>{ G.busy=false; renderActions(); },900);
 }
@@ -500,7 +520,13 @@ function checkBattleEnd(){
     G.kills++;
     const exp=Math.floor(20*G.wild.level*SPECIES[G.wild.sp].expRate);
     toastMsg(`野生 ${G.wild.name} 被击败！`);
+    if(G.wild.sp==='warden'){
+      G.bossDefeated=true; G.questStage=3;
+      toastMsg('裂隙守卫被击退，黑暗裂隙开始收敛！');
+      for(const c of G.party){ c.hp=Math.min(c.maxHp,c.hp + 18); c.energy=Math.min(c.maxEnergy,c.energy + 18); }
+    }
     grantExp(exp,false);
+    refreshQuestProgress();
     endBattle(true); return true;
   }
   // 上场异兽倒下：若还有存活异兽则自动轮换，否则战败
@@ -656,6 +682,16 @@ function drawField(){
         ctx.fillRect(gx,ty*TILE+6,1,7);ctx.fillRect(gx+1,ty*TILE+5,1,8);} }
     if(t===7){ ctx.fillStyle='#3a3050'; ctx.fillRect(tx*TILE+3,ty*TILE+8,2,6);ctx.fillRect(tx*TILE+9,ty*TILE+7,2,7); }
   }
+  // 裂隙门：任务推进到一定程度后浮现
+  if(G.bossUnlocked && !G.bossDefeated){
+    const gx=24*TILE+8, gy=5*TILE+8;
+    ctx.save();
+    ctx.translate(gx,gy);
+    ctx.fillStyle='rgba(166,120,255,0.18)';
+    ctx.beginPath(); ctx.arc(0,0,16+Math.sin(G.time*6)*2,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(199,170,255,0.9)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,12+Math.sin(G.time*8)*2,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='#c7aaff'; ctx.fillRect(-3,-12,6,24); ctx.restore();
+  }
   // 装饰实体（树/岩/泉）按 y 排序
   const ents=[];
   for(let ty=0;ty<MAPH;ty++)for(let tx=0;tx<MAPW;tx++){
@@ -672,11 +708,16 @@ function drawField(){
 function drawFieldHUD(){
   const me=active();
   ctx.textAlign='left'; ctx.font='10px monospace';
-  ctx.fillStyle='rgba(12,14,22,.8)'; ctx.fillRect(8,8,150,me?44:20);
+  ctx.fillStyle='rgba(12,14,22,.8)'; ctx.fillRect(8,8,160,84);
   ctx.fillStyle='#ffd76e'; ctx.fillText(`契约 ${G.caught} · 讨伐 ${G.kills}`,14,22);
   if(me){ ctx.fillStyle='#e8eaf2'; ctx.fillText(`${me.name} Lv.${me.level}  HP ${Math.ceil(me.hp)}/${me.maxHp}`,14,36);
-    ctx.fillStyle='#26262e'; ctx.fillRect(14,40,130,5);
-    ctx.fillStyle=me.hp/me.maxHp>.3?'#5ad45c':'#e8563c'; ctx.fillRect(14,40,130*Math.max(0,me.hp/me.maxHp),5); }
+    ctx.fillStyle='#26262e'; ctx.fillRect(14,42,130,5);
+    ctx.fillStyle=me.hp/me.maxHp>.3?'#5ad45c':'#e8563c'; ctx.fillRect(14,42,130*Math.max(0,me.hp/me.maxHp),5);
+    ctx.fillStyle='#8ad0d8'; ctx.fillText(`能量 ${Math.ceil(me.energy)}/${me.maxEnergy}`,14,58); }
+  // 任务卡
+  ctx.fillStyle='#8ca0d8';
+  const q = G.bossDefeated ? '任务：裂隙已封印，世界恢复安宁' : G.bossUnlocked ? '任务：追击裂隙守卫（暗林右上）' : '任务：击败 6 只异兽 / 捕获 2 只契约';
+  ctx.fillText(q,14,76);
   // 所在域印提示
   const f=fieldForTile(tileAt(Math.floor(P.x/TILE),Math.floor(P.y/TILE)));
   if(f){ ctx.textAlign='center'; ctx.fillStyle='rgba(12,14,22,.7)';
