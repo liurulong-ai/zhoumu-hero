@@ -321,7 +321,12 @@ const keys={};
 addEventListener('keydown',ev=>{
   if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(ev.key))ev.preventDefault();
   keys[ev.code]=true;
-  if(G.state==='title'){ if(ev.code==='Enter'||ev.code==='Digit1') startGame(!!loadGame()); if(ev.code==='Digit2'&&loadGame()) startGame(true); }
+  const MOVE_KEYS=['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
+  if(G.state==='title'){
+    if(ev.code==='Digit1') startGame(false);
+    else if(ev.code==='Digit2'&&loadGame()) startGame(true);
+    else if(ev.code==='Enter'||ev.code==='NumpadEnter'||ev.code==='Space'||MOVE_KEYS.includes(ev.code)) startGame(!!loadGame());
+  }
   else if(G.state==='battle'&&!G.busy){
     if(ev.code>='Digit1'&&ev.code<='Digit4'){ const i=+ev.code.slice(-1)-1; const btns=elActions.querySelectorAll('.act.skill'); if(btns[i])btns[i].click(); }
     if(ev.code==='KeyC') actSeal();
@@ -630,9 +635,10 @@ function drawTitle(){
   const has=!!loadGame();
   ctx.font='12px monospace';
   ctx.fillStyle=Math.sin(G.time*4)>-.3?'#eef2ff':'#6a7089';
-  ctx.fillText(has?'[ Enter ] 继续冒险':'[ Enter ] 开始冒险',W/2,250);
+  ctx.fillText(has?'按 任意键 / 点击 继续冒险':'按 任意键 / 点击 开始冒险',W/2,250);
   ctx.font='9px monospace'; ctx.fillStyle='#565c78';
-  ctx.fillText('WASD 移动 · 战斗点击按钮 / 数字键',W/2,275);
+  ctx.fillText('WASD / 方向键 移动 · 进入草丛水畔岩地暗林遭遇异兽',W/2,272);
+  ctx.fillText('（按 1 开新档，任意键/点击 自动继续存档）',W/2,285);
 }
 const TILE_COLOR={0:'#2f5029',1:'#22301f',2:'#26405c',3:'#4a3a2a',4:'#35682a',5:'#2f5570',6:'#5a4630',7:'#2a2438',8:'#2f6b5a',9:'#6b5a3a'};
 function drawField(){
@@ -731,9 +737,11 @@ function drawHpCard(x,y,c,enemy){
 // ---------------- 主循环 ----------------
 let last=performance.now();
 function loop(now){
-  const dt=Math.min(0.05,(now-last)/1000); last=now; G.time+=dt;
-  if(G.state==='field') updateField(dt);
-  render();
+  try{
+    const dt=Math.min(0.05,(now-last)/1000); last=now; G.time+=dt;
+    if(G.state==='field') updateField(dt);
+    render();
+  }catch(e){ if(window&&window.console) console.error('loop error:',e); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

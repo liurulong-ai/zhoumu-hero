@@ -493,9 +493,13 @@ function hurtPlayer(dmg, kx, ky) {
 
 // ---------- 更新 ----------
 function onPress(code) {
+  const MOVE_KEYS = ['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
   if (G.state === 'title') {
-    if (code === 'Digit1' || code === 'Enter' || code === 'NumpadEnter') startGame(false);
-    if (code === 'Digit2' && loadSave()) startGame(true);
+    if (code === 'Digit1') { startGame(false); return; }
+    if (code === 'Digit2' && loadSave()) { startGame(true); return; }
+    // 任意移动/攻击/确认键：有存档则继续，否则开新档（避免误清进度）
+    if (code === 'Enter' || code === 'NumpadEnter' || code === 'Space' ||
+        code === 'KeyJ' || MOVE_KEYS.includes(code)) startGame(!!loadSave());
   } else if (G.state === 'dead') {
     if (code === 'KeyR' || code === 'Enter') respawn();
   } else if (G.state === 'win') {
@@ -884,10 +888,12 @@ function drawWin() {
 buildMap();
 let last = performance.now();
 function loop(now) {
-  const dt = Math.min(0.05, (now - last) / 1000);
-  last = now;
-  update(dt);
-  render();
+  try {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    update(dt);
+    render();
+  } catch (e) { if (window && window.console) console.error('loop error:', e); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
